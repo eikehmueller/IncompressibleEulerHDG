@@ -1,14 +1,14 @@
 import argparse
 from firedrake import *
 
-from timesteppers.incompressible_euler_conforming_implicit import (
+from timesteppers.conforming_implicit import (
     IncompressibleEulerConformingImplicit,
 )
-from timesteppers.incompressible_euler_dg_implicit import IncompressibleEulerDGImplicit
-from timesteppers.incompressible_euler_hdg_implicit import (
+from timesteppers.dg_implicit import IncompressibleEulerDGImplicit
+from timesteppers.hdg_implicit import (
     IncompressibleEulerHDGImplicit,
 )
-from timesteppers.incompressible_euler_hdg_imex import (
+from timesteppers.hdg_imex import (
     IncompressibleEulerHDGARS232,
     IncompressibleEulerHDGEuler,
 )

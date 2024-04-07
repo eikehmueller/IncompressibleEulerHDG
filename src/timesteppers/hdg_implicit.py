@@ -1,6 +1,6 @@
 import tqdm
 from firedrake import *
-from timesteppers.incompressible_euler import IncompressibleEuler
+from timesteppers.common import IncompressibleEuler
 
 
 class IncompressibleEulerHDGImplicit(IncompressibleEuler):

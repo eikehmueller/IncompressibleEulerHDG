@@ -34,7 +34,7 @@ from abc import abstractmethod
 import tqdm
 
 from firedrake import *
-from timesteppers.incompressible_euler import IncompressibleEuler
+from timesteppers.common import IncompressibleEuler
 
 
 class IncompressibleEulerHDGIMEX(IncompressibleEuler):
