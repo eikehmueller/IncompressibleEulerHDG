@@ -15,7 +15,7 @@ jobs:
           working_directory: doc
           root_file: discretisation.tex
       - name: Copy
-          run: |
+          run: | 
             mkdir out
             cp ./doc/discretisation.pdf ./out/discretisation.pdf      
       - name: Deploy PDF file
