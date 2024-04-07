@@ -25,5 +25,5 @@ jobs:
           CLEAN: true
           SINGLE_COMMIT: true
           FOLDER: doc
-          GITHUB_CONFIG_NAME: eikehmueller
-          GITHUB_CONFIG_EMAIL: e.mueller@bath.ac.uk
+          GIT_CONFIG_NAME: eikehmueller
+          GIT_CONFIG_EMAIL: e.mueller@bath.ac.uk
