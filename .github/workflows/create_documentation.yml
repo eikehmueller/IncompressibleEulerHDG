@@ -16,3 +16,14 @@ jobs:
         with:
           name: PDF
           path: doc/discretisation.pdf
+
+      - name: Deploy PDF file
+        uses: JamesIves/github-pages-deploy-action@3.6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
+          clean: true
+          single_commit: true
+          folder: doc
+          github_config_name: eikehmueller
+          github_config_email: e.mueller@bath.ac.uk
