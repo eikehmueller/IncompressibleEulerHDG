@@ -7,7 +7,7 @@ The goal of this work is to implement higher order hybridisable DG discretisatio
 
 
 ### Mathematical details
-For further details on the used discretisation and timestepping methods see
+For further details on the used discretisation and timestepping methods see [here](https://github.com/eikehmueller/IncompressibleEulerHDG/blob/gh-pages/discretisation.pdf).
 
 ## Installation
 To install this package run 
