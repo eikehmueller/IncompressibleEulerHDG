@@ -20,10 +20,10 @@ jobs:
       - name: Deploy PDF file
         uses: JamesIves/github-pages-deploy-action@3.6.2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: gh-pages
-          clean: true
-          single_commit: true
-          folder: doc
-          github_config_name: eikehmueller
-          github_config_email: e.mueller@bath.ac.uk
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages
+          CLEAN: true
+          SINGLE_COMMIT: true
+          FOLDER: doc
+          GITHUB_CONFIG_NAME: eikehmueller
+          GITHUB_CONFIG_EMAIL: e.mueller@bath.ac.uk
