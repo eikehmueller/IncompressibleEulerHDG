@@ -1,0 +1,24 @@
+# Latex files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+# Generated PDFs
+doc/discretisation.pdf
+
+# Python
+*.pyc
+*__pycache__
+
+# Other
+*.xml
+*.csv
+*.vtu
+*.pvd
+*.json
+*.npy

@@ -1,0 +1,515 @@
+\documentclass[11pt]{article}
+\usepackage{amssymb,amsmath}
+\usepackage{mathrsfs}  
+\usepackage{graphicx}
+\usepackage[margin=2cm]{geometry}
+\usepackage{tikz}
+\usepackage[tikz]{mdframed}
+\mdfdefinestyle{hlframe}{%      
+frametitlebackgroundcolor   =black!15,%                                    
+    backgroundcolor   =black!5,%                                               
+    frametitlerule          =true,%                                            
+    roundcorner     =10pt,%                                                
+    middlelinewidth     =1pt,%                                             
+    innermargin     =0.5cm,%                                               
+    outermargin     =0.5cm,%                                               
+    innerleftmargin     =0.5cm,%                                           
+    innerrightmargin        =0.5cm,%                                       
+    innertopmargin      =0.75\topskip,%                                    
+    innerbottommargin   =0.75\topskip,%                                    
+}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=red,
+    filecolor=magenta,      
+    urlcolor=blue
+    }
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\renewcommand{\div}{\textsf{div}}
+\newcommand{\grad}{\textsf{grad}}
+\newcommand{\rot}{\textsf{rot}}
+\newcommand{\cellint}[2]{\Big(#1\Big)_{#2}}
+\newcommand{\cellintK}[1]{\cellint{#1}{K}}
+\newcommand{\facetint}[2]{\Big\langle #1\Big\rangle_{#2}}
+\newcommand{\facetintK}[1]{\facetint{#1}{\partial K}}
+\newcommand{\facetinttime}[3]{\Big\langle\!\!\Big\langle #1\Big\rangle\!\!\Big\rangle_{#2}^{t=#3}}
+\newcommand{\facetinttimeK}[2]{\Big\langle\!\!\Big\langle #1\Big\rangle\!\!\Big\rangle_{K}^{t=#2}}
+\newcommand{\phat}{\widehat{p}}
+\newcommand{\jump}[1]{[\![ #1]\!]}
+\newcommand{\avg}[1]{\{\!\{#1\}\!\}}
+\renewcommand{\vec}[1]{\boldsymbol{#1}}
+\newcommand{\dof}[1]{\vec{#1}}
+\newcommand{\fspace}[1]{\mathscr{#1}}
+\newcommand{\spaceV}{\fspace{V}}
+\newcommand{\spaceT}{\fspace{T}}
+\newcommand{\pref}{p_{\text{ref}}}
+\newcommand{\Id}{\operatorname{Id}}
+\newcommand{\impl}{{(\text{im})}}
+\newcommand{\expl}{{(\text{ex})}}
+\title{IMEX-HDG dicsretisation of incompressible Euler equations}
+\date{\today}
+\begin{document}
+\maketitle
+The goal of this note is to derive a hybridisable discontinuous Galerkin (HDG) projection method \cite{Chorin1968} for the time-dependent incompressible Euler equation, similar to \cite{Ueckermann2016} where this approach is applied to the Navier-Stokes equations. While in \cite{Ueckermann2016} the presence of the Stokes term requires the hybridisation of both the tentative velocity computation and the pressure solve, for the incompressible Euler equations this is only required in the latter step. The starting point of our derivation is the fully implicit DG formulation of the incompressible Euler equations in \cite{Guzman2016}. Similar to \cite{Ueckermann2016}, we also discuss higher-order IMEX timestepping methods \cite{Ascher1997}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Continuum equations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We consider the incompressible Euler equations for velocity $Q(x,t)$ and pressure $p(x,t)$
+\begin{equation}
+    \begin{aligned}
+        \partial_t Q + (Q\cdot \nabla) Q + \nabla p & = f \\
+        \nabla\cdot Q                               & = 0
+    \end{aligned}\label{eqn:incompressible_euler}
+\end{equation}
+in the domain $\Omega=[0,1]^d$ with the initial condition $Q(x,0) = Q_0(x)$ and the boundary condition \mbox{$(n\cdot Q)_{\partial \Omega}=0$} on $\partial\Omega$. $f$ is a time dependent forcing function.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Notation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We write $\Omega_h$ for the mesh and $\mathcal{E}_h$ for the skeleton of this mesh, i.e. the set of all facets. The set of interior facets is denoted by $\mathcal{E}^i_h$ and the set of boundary facets by $\mathcal{E}^\partial_h$ such that $\mathcal{E}_h= \mathcal{E}^i_h\cup \mathcal{E}^\partial_h$ . Further, for scalar quantities $a$ and vector-valued quantities $b$ we define the average $\avg{\cdot}$ and jump $\jump{\cdot}$ as
+\begin{xalignat}{3}
+    \avg{a} &:= \frac{1}{2}(a^++a^-), &
+    \avg{b} &:= \frac{1}{2}(b^++b^-), &
+    \jump{b\cdot n} &:= b^+\cdot n^+ + b^-\cdot n^-
+\end{xalignat}
+on interior facets $F\in\mathcal{E}_h^i$ and
+\begin{xalignat}{3}
+    \avg{a} &:= a, &
+    \avg{b} &:= b, &
+    \jump{b\cdot n} &:= b\cdot n
+\end{xalignat}
+on boundary facets $F\in\mathcal{E}_h^\partial$. The inner product of two tensors $A$, $B$ is
+\begin{equation}
+    A:B := \sum_{ij} A_{ij} B_{ji} = \operatorname{trace}(AB^\top).
+\end{equation}
+We use the shorthand
+\begin{equation}
+    (f)_A = \int_A f\;dx\qquad\text{for $A \subset \Omega$}
+\end{equation}
+for integrals over $d$-dimensional domains $A$ (typically grid cells) and
+\begin{equation}
+    \langle f\rangle_S = \int_S f\;ds\qquad\text{for $S \subset \mathcal{E}_h$}
+\end{equation}
+for integrals over $d-1$-dimensional domains (typically facets, boundaries of grid cells).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{DG discretisation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We follow the DG discretisation with a central flux as described in \cite{Guzman2016}. Let $P_k(A)$ be the space of polynomials of degree $k$ on $A$, then we define the DG space as
+\begin{equation}
+    \text{DG}_k := \{ v\in L^2(\Omega) : v|_K \in P_k(K) \;\text{for all}\;K\in \Omega_h \}
+\end{equation}
+and assume that
+\begin{equation}
+    \begin{aligned}
+        Q \in V_Q & := [\text{DG}_{k+1}]^d,                    \\
+        p \in Q_p & := \text{DG}_{k}\cap \{v:(v)_{\Omega}=0\}. \\
+    \end{aligned}
+\end{equation}
+We start by post-processing the velocity $Q$ into the divergence free advection velocity $Q^\star$ which is defined as follows:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Post-processed advection velocity}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Let $\text{ND}_{k-1}(K)$ be the space of Nedelec functions of the first kind \cite[Section 3.5.1]{Logg2012}\footnote{Note that in \cite{Logg2012} the lowest order Nedelec element is $\text{ND}_{1}(K)$ whereas it is $\text{ND}_{0}(K)$ in \cite{Guzman2016}; here we use the counting employed in \cite{Guzman2016}.} on the cell $K$. In each cell $K\in\Omega_h$ and for a given $Q\in V_Q$ we look for $(Q^\star_K,\sigma_K,r_K) \in W_K = [P_{k+1}(K)]^d\times \text{ND}_{k-1}(K)\times \left(\oplus_{F\in\partial K} P_{k+1}(F)\right)$ which satisfy the following weak form:
+\begin{equation}
+    (Q^\star_K\cdot  \omega_K)_K + \langle (Q_K^\star\cdot n)s_K\rangle_{\partial K} + (v_K\cdot \sigma_K)_K + \langle (v_K\cdot n)r_K\rangle_{\partial K} = (Q\cdot\omega_K)_K + \langle (Q\cdot n)s_K\rangle_{\partial K\cap \mathcal{E}_h^i}\label{eqn:bdm_projection}
+\end{equation}
+for all test functions $(v_K,\omega_K,s_K)\in W_K$. Note that since the solution satisfies $\sigma_K=0$ and $r_K=0$ this is equivalent to Eqs. (2.25) and (2.26) in \cite{Guzman2016}, but to implement these two constraints in Firedrake we need to make sure that the weak form corresponds to a square matrix. For future reference we write $Q^\star = \mathcal{P}(Q)$, observing that $\mathcal{P}:V_Q \rightarrow V_Q$ is a linear operator; in fact as argued in \cite{Guzman2016} $\mathcal{P}$ projects onto the H-div conforming subspace $\text{BDM}^0_{k+1}(\Omega_h)$. The normal component of $Q^\star$ is continuous ($\jump{Q^\star\cdot n} = 0$). Since we only consider integrals over interior facets in the final term on the right hand side of Eq. \eqref{eqn:bdm_projection}, we have that $(n\cdot Q^\star)_{\partial \Omega} = 0$ on the boundary $\partial\Omega$ of the domain. As shown in \cite{Guzman2016} the post-processed velocity $Q^\star$ is divergence free in the strong sense $\nabla \cdot Q^\star=0$.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Original scheme}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The discretisation proposed in \cite{Guzman2016} (see Eqs. (2.27) and (2.28) there) is: for given forcing function $f$ find $(Q,p)\in V_Q\times V_p$ such that
+\begin{equation}
+    \begin{aligned}
+        (\partial_t Q\cdot w)_{K} - (Q\otimes Q^\star:\nabla w)_{K} - (p\nabla\cdot w)_{K} + \langle \widehat{\sigma}: n\otimes w \rangle_{\partial K} & = (f\cdot w)_{K} \\
+        - (Q\cdot \nabla \psi)_{K} + \langle (\widehat{Q}\cdot n)\psi\rangle_{\partial K}                                                              & =0
+    \end{aligned}
+\end{equation}
+for all test functions $(w,\psi)\in V_Q\times V_p$ and all cells. The numerical fluxes $\widehat{\sigma}$ and $\widehat{Q}$ are defined as
+\begin{equation}
+    \begin{aligned}
+        \widehat{\sigma}   & := \avg{p} \Id  + \alpha h_F^{-1} \jump{Q\cdot n} \Id       + \begin{cases}
+                                                                                               \avg{Q}\otimes Q^\star       & \text{for the central flux}, \\
+                                                                                               Q^{\text{up}}\otimes Q^\star & \text{for the upwind flux}
+                                                                                           \end{cases} \\
+        \widehat{Q}\cdot n & := \avg{Q}\cdot n.
+    \end{aligned}\label{eqn:flux_original}
+\end{equation}
+with the upwind velocity defined as
+\begin{equation}
+    Q^\text{up} = \begin{cases}
+        Q^+ & \text{if $Q\cdot n\ge 0$} \\
+        Q^- & \text{otherwise}
+    \end{cases}
+\end{equation}
+This leads to the time-dependent scheme for computing $(Q^{n+1},p^{n+1})\in V_Q\times V_p$ from $Q^n$ and $f^n$, the value of the forcing function at timestep $n$:
+\begin{subequations}
+    \begin{align}
+        (Q^{n+1}\cdot w)_{\Omega_h} + \Delta t\Big[  \left(w\cdot (Q^\star\cdot \nabla) Q^{n+1}\right)_{\Omega_h}                                                                                            &
+        \notag                                                                                                                                                                                                                                                                     \\ + \alpha \Big(\sum_{F\in\mathcal{E}_h^i} h_F^{-1}\langle \jump{Q^{n+1}\cdot n} \jump{w\cdot n}\rangle_F                                      +  \sum_{F\in\mathcal{E}_h^\partial} h_F^{-1}\langle (Q^{n+1}\cdot n) (w\cdot n)\rangle_F \Big)                                        &  \label{eqn:time_dependent_original_momentum}                                                            \\
+        -\sum_{F\in\mathcal{E}_h^i} \langle (Q^\star \cdot n^+)(Q^{n+1}_+ - Q^{n+1}_-)\cdot \avg{w}\rangle_F\notag                                                                                           &                                                                     \\
+        +\delta_{\text{up}}\sum_{F\in\mathcal{E}_h^i} \langle \left|Q^\star \cdot n^+\right|(Q^{n+1}_+ - Q^{n+1}_-)\cdot (w^+-w^-)\rangle_F
+                                                                                                                                                                                                             & \notag                                                              \\
+        - (p^{n+1} \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\avg{p^{n+1}}\rangle_{F}+  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)p^{n+1}\rangle_{F}    \Big] & = (Q^n\cdot w)_{\Omega_h} + \Delta t (f^n\cdot w)_{\Omega_h} \notag \\
+        (\psi \nabla\cdot Q^{n+1})_{\Omega_h} - \sum_{F\in\mathcal{E}_h^i} \langle \jump{Q^{n+1}\cdot n}\avg{\psi}\rangle_{F} - \sum_{F\in\mathcal{E}_h^\partial} \langle (Q^{n+1}\cdot n)\psi\rangle_{F}    & = 0\label{eqn:time_dependent_original_continuity}
+    \end{align}
+\end{subequations}
+for all test functions $(w,\psi) \in V_Q\times V_p$ where $\delta_{\text{up}}=1$ for the upwind flux and $\delta_{\text{up}}=0$ for the central flux. In contrast to \cite{Guzman2016} the boundary condition $(n\cdot Q^{n+1})_{\partial \Omega}=0$ is enforced weakly through the penalty term in the second line of Eq. \eqref{eqn:time_dependent_original_momentum}, this introduces additional boundary integrals.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Hybridised scheme}\label{sec:hdg_implicit}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+To hybridise we replace the numerical fluxes in Eq. \eqref{eqn:flux_original} by
+\begin{equation}
+    \begin{aligned}
+        \widehat{\sigma}   & := \lambda \Id  + \alpha h_F^{-1} \jump{Q\cdot n} \Id       + \begin{cases}
+                                                                                               \avg{Q}\otimes Q^\star       & \text{for the central flux}, \\
+                                                                                               Q^{\text{up}}\otimes Q^\star & \text{for the upwind flux}
+                                                                                           \end{cases} \\
+        \widehat{Q}\cdot n & := Q\cdot n + \tau (p-\lambda).
+    \end{aligned}\label{eqn:flux_hdg}
+\end{equation}
+for some stability parameter $\tau>0$ and the function $\lambda\in V_\text{trace}$ defined on the trace space
+\begin{equation}
+    V_{\text{trace}} = \{ v\in L^2(\mathcal{E}_h) : v|_F \in P_k(F) \;\text{for all}\;F\in \mathcal{E}_h \}.
+\end{equation}
+We also introduce a transmission condition which guarantees that the normal component of $\widehat{Q}$ is single-valued:
+\begin{equation}
+    0 = \langle \jump{\widehat{Q}\cdot n} \mu \rangle_F = \langle (\jump{Q\cdot n} + 2\tau\avg{p-\lambda})\mu \rangle_F \qquad \text{for all $F\in\mathcal{E}_h^i$ and all $\mu\in V_{\text{trace}}$} \label{eqn:jump_condition_interior}
+\end{equation}
+and enforce the boundary condition weakly by requiring that
+\begin{equation}
+    0 = \langle (\widehat{Q}\cdot n) \mu \rangle_F = \langle (Q\cdot n + \tau(p-\lambda))\mu \rangle_F \qquad \text{for all $F\in\mathcal{E}_h^\partial$ and all $\mu\in V_{\text{trace}}$}\label{eqn:jump_condition_boundary}
+\end{equation}
+As a result, Eqs. \eqref{eqn:time_dependent_original_momentum} and \eqref{eqn:time_dependent_original_momentum} get replaced by: for given $Q^n,f^n\in V_Q$ find
+$(Q^{n+1},p^{n+1},\lambda^{n+1})\in V_Q\times V_p\times V_{\text{trace}}$
+\begin{subequations}
+    \begin{align}
+        (Q^{n+1}\cdot w)_{\Omega_h} + \Delta t\Big[  \left(w\cdot (Q^\star\cdot \nabla) Q^{n+1}\right)_{\Omega_h}  -\sum_{F\in\mathcal{E}_h^i} \langle (Q^\star \cdot n^+)(Q^{n+1}_+ - Q^{n+1}_-)\cdot \avg{w}\rangle_F                              &
+        \notag                                                                                                                                                                                                                                                                                                             \\
+        +\delta_{\text{up}}\sum_{F\in\mathcal{E}_h^i} \langle \left|Q^\star \cdot n^+\right|(Q^{n+1}_+ - Q^{n+1}_-)\cdot (w^+-w^-)\rangle_F                                                                                                          & \label{eqn:time_dependent_hdg_momentum}                             \\
+        + \alpha \Big(\sum_{F\in\mathcal{E}_h^i} h_F^{-1}\langle \jump{Q^{n+1}\cdot n} \jump{w\cdot n}\rangle_F                                      +  \sum_{F\in\mathcal{E}_h^\partial} h_F^{-1}\langle (Q^{n+1}\cdot n) (w\cdot n)\rangle_F \Big) & \notag                                                              \\
+        - (p^{n+1} \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda^{n+1}\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda^{n+1}\rangle_{F}     \Big]                                & = (Q^n\cdot w)_{\Omega_h} + \Delta t (f^n\cdot w)_{\Omega_h} \notag \\
+        (\psi \nabla\cdot Q^{n+1})_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p^{n+1}-\lambda^{n+1})\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p^{n+1}-\lambda^{n+1})\psi\rangle_{F}            & = 0  \label{eqn:time_dependent_hdg_continuity}                      \\
+        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{Q^{n+1}\cdot n}+2\tau \avg{p^{n+1}-\lambda^{n+1}}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(Q^{n+1}\cdot n+\tau (p^{n+1}-\lambda^{n+1})\right)\mu \rangle_{F}   & = 0\label{eqn:time_dependent_hdg_trace}
+    \end{align}
+\end{subequations}
+for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$. Observe that Eqs. \eqref{eqn:time_dependent_original_momentum} and \eqref{eqn:time_dependent_hdg_momentum} only differ in the final two terms on the left hand side.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Split hybridised scheme}\label{sec:split_hybridised}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Finally, we split the update $Q^{n} \mapsto (Q^{n+1},p^{n+1},\lambda^{n+1})$ in Eqs. \eqref{eqn:time_dependent_hdg_momentum}, \eqref{eqn:time_dependent_hdg_continuity}, \eqref{eqn:time_dependent_hdg_trace} into two steps:
+\begin{itemize}
+    \item The computation of a tentative velocity $\overline{Q}$ which is not necessarily divergence-free
+    \item The solution of a mixed Poisson equation for the pressure $p^{n+1}$ at the next time step and a velocity correction $\delta Q$ which renders the velocity $Q^{n+1} = \overline{Q}-\Delta t \delta Q$ at the next timestep divergence free (in the weak sense)
+\end{itemize}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Tentative velocity.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+To obtain $\overline{Q}$, replace $Q^{n+1} \mapsto \overline{Q}$ in Eq. \eqref{eqn:time_dependent_hdg_momentum} and drop all terms which contain the pressure $p^{n+1}$ and hybridised pressure $\lambda^{n+1}$ (these will be dealt with in the next step):
+\begin{equation}
+    \begin{aligned}
+        (\overline{Q}\cdot w)_{\Omega_h} + \Delta t\Big[  \left(w\cdot (Q^\star\cdot \nabla) \overline{Q}\right)_{\Omega_h}  -\sum_{F\in\mathcal{E}_h^i} \langle (Q^\star \cdot n^+)(\overline{Q}_+ - \overline{Q}_-)\cdot \avg{w}\rangle_F & \\
+        +\delta_{\text{up}}\sum_{F\in\mathcal{E}_h^i} \langle \left|Q^\star \cdot n^+\right|(\overline{Q}_+ - \overline{Q}_-)\cdot (w^+-w^-)\rangle_F                                                                                       & \\+ \alpha \Big(\sum_{F\in\mathcal{E}_h^i} h_F^{-1}\langle \jump{\overline{Q}\cdot n} \jump{w\cdot n}\rangle_F                                      +  \sum_{F\in\mathcal{E}_h^\partial} h_F^{-1}\langle (\overline{Q}\cdot n) (w\cdot n)\rangle_F \Big)  \Big]          & = (Q^n\cdot w)_{\Omega_h} + \Delta t (f^n\cdot w)_{\Omega_h}
+    \end{aligned}\label{eqn:tentative_velocity}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Mixed Poisson.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+In the continuum, the mixed Poisson equation that we need to solve can be written as
+\begin{xalignat}{2}
+    \delta Q + \nabla p^{n+1} &= 0, &
+    \nabla \cdot \delta Q &= -\frac{1}{\Delta t} \nabla\cdot \overline{Q}.
+\end{xalignat}
+In a single cell $K$ the weak form is
+\begin{equation}
+    \begin{aligned}
+        (w\cdot \delta Q)_K - (p^{n+1} \nabla \cdot w)_K + \langle(n\cdot w) \widehat{p}^{n+1}\rangle_{\partial K}   & = 0,                                                                                                                                                 \\
+        (\psi \nabla \cdot\delta Q)_K + \langle \psi(\widehat{\delta Q}\cdot n- \delta Q\cdot n)\rangle_{\partial K} & = -\frac{1}{\Delta t}\left((\psi\nabla\cdot\overline{Q})_K - \langle \psi(\overline{Q}-\mathcal{A}(\overline{Q}))\cdot n\rangle_{\partial K} \right)
+    \end{aligned}
+\end{equation}
+with the hybridised fluxes
+\begin{equation}
+    \begin{aligned}
+        \widehat{p}^{n+1}         & = \lambda^{n+1}                                 \\
+        \widehat{\delta Q}\cdot n & = \delta Q\cdot n + \tau(p^{n+1}-\lambda^{n+1})
+    \end{aligned}
+\end{equation}
+where $\tau$ is the stabilisation parameter as before.
+The velocity $\mathcal{A}(\overline{Q})$ is single valued on each facet and defined as
+\begin{equation}
+    \mathcal{A}(Q) := \begin{cases}
+        0       & \text{on boundary facets $F \subset \partial \Omega$ }  \\
+        \avg{Q} & \text{on interior facets $F\not\subset\partial\Omega$.} \\
+    \end{cases}.
+\end{equation}
+We also require the numerical flux $\widehat{\delta Q}$ to be unique on interior facets and enforce the flux boundary condition $(Q\cdot n)_{\partial \Omega}=0$ weakly:
+\begin{equation}
+    \begin{aligned}
+        \langle \jump{\widehat{\delta Q}\cdot n} \mu \rangle_F = \langle (\jump{\delta Q\cdot n} + 2\tau\avg{p^{n+1}-\lambda^{n+1}})\mu \rangle_F & =0 \qquad \text{for all $F\in\mathcal{E}_h^i$}         \\
+        \langle (\widehat{\delta Q}\cdot n) \mu \rangle_F = \langle (\delta Q\cdot n + \tau(p^{n+1}-\lambda^{n+1}))\mu \rangle_F                  & = 0\qquad \text{for all $F\in\mathcal{E}_h^\partial$}.
+    \end{aligned}
+\end{equation}
+for all test functions $\mu\in V_{\text{trace}}$.
+Putting everything together we need to solve the following weak problem: find $(\delta Q,p^{n+1},\lambda^{n+1}) \in V_Q\times V_p\times V_{\text{trace}}$ such that
+\begin{subequations}
+    \begin{align}
+        (\delta Q\cdot w)_{\Omega_h} - (p^{n+1} \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda^{n+1}\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda^{n+1}\rangle_{F}             & = 0\label{eqn:mixed_poisson_velocity}                                                   \\
+        (\psi \nabla\cdot \delta Q)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p^{n+1}-\lambda^{n+1})\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p^{n+1} - \lambda^{n+1})\psi\rangle_{F}         & = -\frac{1}{\Delta t}  \text{Div}(\psi,\overline{Q}) \label{eqn:mixed_poisson_pressure} \\
+        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{\delta Q\cdot n}+2\tau \avg{p^{n+1}-\lambda^{n+1}}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(\delta Q\cdot n+\tau (p^{n+1}-\lambda^{n+1})\right)\mu \rangle_{F} & = 0
+        \label{eqn:mixed_poisson_uniqueness}
+    \end{align}
+\end{subequations}
+for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$ where the weak divergence is given by
+\begin{equation}
+    \text{Div}(\psi,Q) := (\psi \nabla \cdot Q)_{\Omega_h}-\sum_{F\in\mathcal{E}_h^i}\langle\psi(Q-\avg{Q})\cdot n\rangle_F-\sum_{F\in\mathcal{E}_h^\partial}\langle\psi (Q\cdot n)\rangle_F
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Final update.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Having computed $\overline{Q}$ with Eq. \eqref{eqn:tentative_velocity} and $\delta Q$, $p^{n+1}$ with Eqs. \eqref{eqn:mixed_poisson_velocity}, \eqref{eqn:mixed_poisson_pressure}, \eqref{eqn:mixed_poisson_uniqueness}, the velocity at the next timestep is computed as
+\begin{equation}
+    Q^{n+1} = \overline{Q} + \Delta t\; \delta Q.
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{IMEX timestepping}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The above method uses a simple timestepping approach and we therefore expect it to be first order in time. This can be improved by using the higher-order IMEX \cite{Ascher1997} scheme described in \cite[Section 4]{Ueckermann2016}.
+
+Let $(Q,p,\lambda)\in V_Q\times V_p\times V_{\text{trace}}$ be the time dependent state of the system. Consider the time-evolution equation in weak form
+\begin{equation}
+    (w\cdot \partial_t Q)_{\Omega_h} = f^\impl(w,Q,\mathcal{P}(Q))  + f^\expl(w;t) + g(w,p,\lambda)\label{eqn:time_evolution}
+\end{equation}
+subject to the weak incompressibility constraint
+\begin{equation}
+    \Gamma(\psi,\mu,Q,p,\lambda) = 0\label{eqn:constraint}
+\end{equation}
+where $w\in V_Q$, $\psi\in V_p$, $\mu\in V_{\text{trace}}$ are test functions. Looking at Eqs. \eqref{eqn:time_dependent_hdg_momentum}, \eqref{eqn:time_dependent_hdg_continuity} and \eqref{eqn:time_dependent_hdg_trace} the weak forms are
+\begin{subequations}
+    \begin{align}
+        f^\expl(w;t)                 & := (w\cdot f(t))_{\Omega_h}                                                                                                                                                                                                                                    \\
+        f^\impl(w,Q,Q^\star)         & := -\left(w\cdot (Q^\star\cdot \nabla) Q\right)_{\Omega_h}  +\sum_{F\in\mathcal{E}_h^i} \langle (Q^\star \cdot n^+)(Q_+ - Q_-)\cdot \avg{w}\rangle_F               \notag                                                                                      \\
+                                     & -\delta_{\text{up}}\sum_{F\in\mathcal{E}_h^i} \langle \left|Q^\star \cdot n^+\right|(Q_+ - Q_-)\cdot (w^+-w^-)\rangle_F  \label{eqn:imex_fimpl}                                                                                                                \\
+                                     & - \alpha \Big(\sum_{F\in\mathcal{E}_h^i} h_F^{-1}\langle \jump{Q\cdot n} \jump{w\cdot n}\rangle_F                                      +  \sum_{F\in\mathcal{E}_h^\partial} h_F^{-1}\langle (Q\cdot n) (w\cdot n)\rangle_F \Big)                 \notag        \\
+        g(w,p,\lambda)               & := (p \nabla\cdot w)_{\Omega_h} -  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda\rangle_{F}  -  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda\rangle_{F}      \label{eqn:imex_pressure_gradient}                                     \\
+        \Gamma(\psi,\mu,Q,p,\lambda) & := (\psi \nabla\cdot Q)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p-\lambda)\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p-\lambda)\psi\rangle_{F}                      \label{eqn:imex_incompressibility} \\
+                                     & +\sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{Q\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(Q\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}\notag
+    \end{align}
+\end{subequations}
+Note that $g(w,p,\lambda)$ in Eqs. \eqref{eqn:time_evolution}, \eqref{eqn:imex_pressure_gradient} is the (weak) pressure gradient which, together with the constraint in Eqs. \eqref{eqn:constraint}, \eqref{eqn:imex_incompressibility} ensures that the velocity is divergence free ($\nabla \cdot Q=0$) in the weak sense.
+Restricting ourselves to the special case $b_0^\impl=a_{i,0}^\impl=0$, an $s$-stage IMEX-RK scheme is given by: find $(Q^{n+1},p^{n+1},\lambda^{n+1})\in V_Q\times V_p\times V_{\text{trace}}$ such that
+\begin{equation}
+    \begin{aligned}
+        (w\cdot Q^{n+1})_{\Omega_h} & = (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{i=1}^{s-1} b_i^\impl f^\impl(w,Q_i,\mathcal{P}(Q_{i-1})) \\&\qquad +\Delta t \sum_{i=0}^{s-1} b_i^\expl f^\expl(w;t^n+c_i \Delta t)+\Delta t\; g(w,p^{n+1},\lambda^{n+1})
+    \end{aligned}\label{eqn:Q_nplus1_equation}
+\end{equation}
+subject to the constraint
+\begin{equation}
+    \Gamma(\psi,\mu,Q^{n+1},p^{n+1},\lambda^{n+1}) = 0\label{eqn:Q_nplus1_equation_constraint}
+\end{equation}
+for all test functions $(w,\psi,\mu)\in V_Q\times V_p\times V_{\text{trace}}$. Observe that the pressure at the next timestep appears on the right hand side of Eq. \eqref{eqn:Q_nplus1_equation}.
+The coefficients that define a particular IMEX method are usually written down in the form of Butcher Tableaus, see Section \ref{sec:butcher_tableaus} for details.
+
+The stage variables $Q_1,Q_2,\dots,Q_{s-1}\in V_Q$, $p_1,p_2,\dots,p_{s-1}\in V_p$ and $\lambda_1,\lambda_2,\dots,\lambda_{s-1}\in V_{\text{trace}}$ are obtained by: for $i=1,2,\dots,s-1$ find $(Q_i,p_i,\lambda_i)\in V_Q\times V_p\times V_{\text{trace}}$ such that
+\begin{equation}
+    \left((Q_i\cdot w)_{\Omega_h} - \Delta t\; a_{i,i}^\impl \big(f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))+g(w,p_i,\lambda_i)\big)\right)
+    = r_i(w)\qquad\text{for all $w\in V_Q$}\label{eqn:imex_implicit_solve}
+\end{equation}
+with $Q_0=Q^n$, $p_0=p^n$ subject to the constraint
+\begin{equation}
+    \Gamma(\psi,\mu,Q_i,p_i,\lambda_i) = 0\qquad\text{for all $\psi\in V_p$, $\mu\in V_{\text{trace}}$}.\label{eqn:imex_implicit_solve_constraint}
+\end{equation}
+At each stage the residual $r_i$ is a one-form defined by
+\begin{equation}
+    \begin{aligned}
+        r_i(w) & := (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{j=1}^{i-1} a_{i,j}^\impl f^\impl(w,Q_j,\mathcal{P}(Q_{j-1})) +\Delta t \sum_{j=0}^{i-1}a_{i,j}^\expl f^\expl(w;t^n+c_j \Delta t).
+    \end{aligned}
+    \label{eqn:imex_residual_preliminary}
+\end{equation}
+However, to avoid re-evaluating $f^\impl$ and to ensure that corresponding terms cancel in the projection method, we use Eq. \eqref{eqn:imex_implicit_solve} to express $f^\impl(w,Q_j,\mathcal{P}(Q_{j-1}))$ in terms of $(Q_j\cdot w)_{\Omega_h}$ and $r_j(w)$. Note that the contribution from the pressure gradient $g(w,p_j,\lambda_j)$ is irrelevant since can be absorbed into a redefinition of the pressure $p_i$, $\lambda_i$ that appears on the left hand side of Eq. \eqref{eqn:imex_implicit_solve}. With this, we arrive at the following recursive definition of the residual in Eq. \eqref{eqn:imex_residual_preliminary}
+\begin{equation}
+    \begin{aligned}
+        r_i(w) & := (w\cdot Q^n)_{\Omega_h} + \sum_{j=1}^{i-1} \frac{a_{i,j}^\impl}{a_{j,j}^\impl} \big((Q_j\cdot w)_{\Omega_h}-r_j(w)\big) +\Delta t \sum_{j=0}^{i-1}a_{i,j}^\expl f^\expl(w;t^n+c_j \Delta t).
+    \end{aligned}
+    \label{eqn:imex_residual}
+\end{equation}
+Eq. \eqref{eqn:imex_implicit_solve} together with the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} is a linear equation for $(Q_i,p_i,\lambda_i)$. Instead of solving this linear equation in one go as in Section \ref{sec:hdg_implicit}, we might proceed in two stages by using the projection method from Section \ref{sec:split_hybridised} as a preconditioner for a Picard iteration.
+
+The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the calculation of the final residual in Eq. \eqref{eqn:final_residual} we again expressed $f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))$ in terms of $(Q_i\cdot w)_{\Omega_h}$ and $r_i(w)$, compare the manipulations that transform Eq. \eqref{eqn:imex_residual_preliminary} into Eq. \eqref{eqn:imex_residual}. The pressures $p'$ and $\lambda'$ that are computed when solving \eqref{eqn:final_update} are only required to ensure that $Q^{n+1}$ is divergence free.
+\begin{algorithm}
+    \caption{IMEX-HDG timestepping with $s$ stages (optionally based on the projection method): compute $Q^{n+1},p^{n+1}$ at the next timestep given $Q^{n},p^{n}$ at the current time $t^n=n\Delta t$.}
+    \label{alg:imex_hdg}
+    \begin{algorithmic}[1]
+        \State{Initialise $Q_0:=Q^n$, $p_0:=p^n$}
+        \If {$n=0$}
+        \State{Compute $\lambda_0$ by solving Eqs. \eqref{eqn:jump_condition_interior} and \eqref{eqn:jump_condition_boundary} for $\lambda$, given $Q=Q^n$, $p=p^n$.}
+        \EndIf
+        \For {$i=1,\dots,s-1$}
+        \State{Compute the residual $r_i(w)$ defined in Eq. \eqref{eqn:imex_residual}}
+        \State{Set $Q^\star_{i-1}:=\mathcal{P}(Q_{i-1})$}
+        \If {\textsf{use$\_$projection$\_$method}}
+        \State{Iteratively solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} with Alg. \ref{alg:picard}.}
+        \Else
+        \State{Solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} exactly in one step.}
+        \EndIf
+        \EndFor
+        \State{Compute $Q^{n+1}$, $p'$, $\lambda'$ by solving Eq. \eqref{eqn:Q_nplus1_equation} subject to the constraint in Eq. \eqref{eqn:Q_nplus1_equation_constraint}. For this, solve
+            \begin{equation}
+                \begin{aligned}
+                    (Q^{n+1}\cdot w)_{\Omega_h} -
+                    g(w,p',\lambda')                     & = r^{n+1}(w) \\
+                    \Gamma(\phi,\mu,Q^{n+1},p',\lambda') & = 0
+                \end{aligned}\label{eqn:final_update}
+            \end{equation}
+        }
+        with
+        \begin{equation}
+            \begin{aligned}
+                r^{n+1}(w) & := (w\cdot Q^n)_{\Omega_h} +  \sum_{i=1}^{s-1} \frac{b_i^\impl}{a_{i,i}^\impl} \big((Q_i\cdot w)_{\Omega_h}-r_i(w)\big) +\Delta t \sum_{i=0}^{s-1} b_i^\expl f^\expl(w;t^n+c_i \Delta t) .
+            \end{aligned}\label{eqn:final_residual}
+        \end{equation}
+        \State{Compute the (hybridised) pressure at the next timestep as
+            \begin{xalignat}{2}
+                p^{n+1} &= \sum_{i=1}^{s-1}  b_i^\impl p_i, &
+                \lambda^{n+1} &= \sum_{i=1}^{s-1} b_i^\impl \lambda_i
+            \end{xalignat}}
+    \end{algorithmic}
+\end{algorithm}
+\begin{algorithm}
+    \caption{Picard iteration. Approximately solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint}, using the projection method as a preconditioner with a fixed number of $N$ iterations.}
+    \label{alg:picard}
+    \begin{algorithmic}[1]
+        \State{Initialise $Q_i^{(0)} = Q_{i-1}$, $p_i^{(0)} = p_{i-1}$, $\lambda_i^{(0)} := \lambda_{i-1}$.}
+        \For {$k=1,2,\dots,N$}
+        \State{Set
+            \begin{equation}
+                \delta r_i^{(k)}(w) = r_i(w)- (Q_i^{(k-1)}\cdot n)_{\Omega_h} + a_{i,i}^\impl\Delta t \left(f^\impl(w,Q_i^{(k-1)},Q_{i-1}^\star)+g(w,p_i^{(k-1)},\lambda_i^{(k-1)})\right)
+            \end{equation}
+        }
+        \State{\textbf{Step I}: Compute the tentative velocity $\overline{Q}$ by solving (cf. Eq. \eqref{eqn:tentative_velocity})
+            \begin{equation}
+                \begin{aligned}
+                    (\overline{Q}\cdot w)_{\Omega_h} - a_{i,i}^\impl\Delta t\; f^\impl(w,Q,Q_{i-1}^\star) & = \delta r_i(w).
+                \end{aligned}
+            \end{equation}
+        }
+        \State{\textbf{Step II}: given $\overline{Q}$, compute increments $\delta p$, $\delta \lambda$ and $\delta Q$ by solving (cf. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness})
+            \begin{equation}
+                \begin{aligned}
+                    (\delta Q\cdot w)_{\Omega_h} - g(w,\delta p,\delta \lambda) & = -\frac{1}{a_{i,i}^\impl \Delta t} \text{Div}(w,\overline{Q}) \\
+                    \Gamma(\psi,\mu,\delta p,\delta \lambda)                    & = 0
+                \end{aligned}
+            \end{equation}
+        }
+        \State{\textbf{Step III}: Update
+            \begin{xalignat}{3}
+                Q_i^{(k)} &= Q_i^{(k-1)} + \overline{Q} + a_{i,i}^\impl \Delta t\;\delta Q, &
+                p_i^{(k)} &= p_i^{(k-1)} + \delta p, &
+                \lambda_i^{(k)} &= \lambda_i^{(k-1)} + \delta \lambda.
+            \end{xalignat}
+        }
+        \EndFor
+        \State{\Return $Q_i^{(N)},p_i^{(N)},\lambda_i^{(N)}$}
+    \end{algorithmic}
+\end{algorithm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Butcher Tableaus}\label{sec:butcher_tableaus}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The coefficients $a_{i,j}^\impl$, $a_{i,j}^\expl$, $b_{i}^\impl$, $b_{i}^\expl$ and $c_j$ that define a particular IMEX method can be written in the form of Butcher-Tableaus, see Tab. \ref{tab:butcher_tableaus}. The Butcher-Tableaus for a range of IMEX methods can be found for example in \cite{Weller2013}, for reference the ARS(2,3,2) method is shown in Tab. \ref{tab:butcher_tableau_ars232}.
+\begin{table}
+    \begin{minipage}{0.45\linewidth}
+        \begin{center}
+            \begin{tabular}{c|cccccc}
+                0         & 0                 &                   & \dots    &          &                     & 0               \\
+                $c_1$     & $a_{1,0}^\expl$   & 0                                                                               \\
+                $c_2$     & $a_{2,0}^\expl$   & $a_{2,1}^\expl$   & 0        &          &                     & \vdots          \\
+                \vdots    & \vdots            &                   & $\ddots$ & $\ddots$                                         \\
+                $c_{s-2}$ & $a_{s-2,0}^\expl$ & \dots             &          & $\ddots$ & 0                                     \\
+                $c_{s-1}$ & $a_{s-1,0}^\expl$ & $a_{s-1,1}^\expl$ & \dots    &          & $a_{s-1,s-2}^\expl$ & 0               \\
+                \hline
+                          & $b_0^\expl$       & $b_1^\expl$       & \dots    &          & $b_{s-2}^\expl$     & $b_{s-1}^\expl$ \\
+            \end{tabular}
+        \end{center}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\linewidth}
+        \begin{center}
+            \begin{tabular}{|cccccc}
+                0      &                   & \dots           &          &                     & 0                   \\
+                0      & $a_{1,1}^\impl$                                                                            \\
+                0      & $a_{2,1}^\impl$   & $a_{2,2}^\impl$ &          &                     & \vdots              \\
+                \vdots &                   & $\ddots$        & $\ddots$                                             \\
+                0      & \dots             &                 & $\ddots$ & $a_{s-2,s-2}^\impl$                       \\
+                0      & $a_{s-1,1}^\impl$ & \dots           &          & $a_{s-1,s-2}^\impl$ & $a_{s-1,s-1}^\impl$ \\
+                \hline
+                0      & $b_1^\impl$       & \dots           &          & $b_{s-2}^\impl$     & $b_{s-1}^\impl$
+            \end{tabular}
+        \end{center}
+    \end{minipage}
+    \caption{Generic form of Butcher Tableaus for IMEX methods considered here (recall that we assume that $a_{i,0}^\impl = b_0^\impl=0$ and hence the first column of the implicit tableau on the right hand side contains only zeros).}
+    \label{tab:butcher_tableaus}
+\end{table}
+\begin{table}
+    \begin{minipage}{0.25\linewidth}
+        \begin{center}
+            \begin{tabular}{c|ccc}
+                0        & 0        & 0          & 0        \\
+                $\gamma$ & $\gamma$ & 0          & 0        \\
+                1        & $\delta$ & $1-\delta$ & 0        \\
+                \hline
+                         & 0        & $1-\gamma$ & $\gamma$
+            \end{tabular}
+        \end{center}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.25\linewidth}
+        \begin{center}
+            \begin{tabular}{|ccc}
+                0 & 0          & 0        \\
+                0 & $\gamma$   & 0        \\
+                0 & $1-\gamma$ & $\gamma$ \\
+                \hline
+                0 & $1-\gamma$ & $\gamma$
+            \end{tabular}
+        \end{center}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.35\linewidth}
+        \begin{xalignat*}{2}
+            \gamma & = 1 - \frac{1}{\sqrt{2}},&
+            \delta & = -\frac{2}{3}\sqrt{2}
+        \end{xalignat*}
+    \end{minipage}
+    \caption{Butcher Tableaus for the ARS(2,3,2) method, see \cite[Fig. 2]{Weller2013}}
+    \label{tab:butcher_tableau_ars232}
+\end{table}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\appendix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Exact solution}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+An exact solution of the two-dimensional incompressible Euler equations in Eq. \eqref{eqn:incompressible_euler} is given by for the stationary case $f=0$ by
+\begin{equation}
+    \begin{aligned}
+        Q_s(x,y) & = \begin{pmatrix}-C(x)S(y)\\S(x)C(y)\end{pmatrix} \\
+        p_s(x,y) & = p_0 - C(x)C(y)
+    \end{aligned}
+\end{equation}
+where
+\begin{xalignat}{2}
+    S(z) &= \sin\left(\frac{2z-1}{2}\pi\right),&
+    C(z) &= \cos\left(\frac{2z-1}{2}\pi\right).
+\end{xalignat}
+Note that the derivatives of these functions satisfy $S'(z)=\pi C(z)$ and $C'(z)=-\pi S(z)$. From this a divergence-free time-dependent solution for the special case
+\begin{equation}
+    f = \frac{d\Psi}{dt} Q_s(x,y).
+\end{equation}
+with arbitrary scalar function $\Psi(t)$ can be constructed as
+\begin{xalignat}{2}
+    Q(x,y,t) & = \Psi(t)Q_s(x,y),&
+    p(x,y,t) & = \Psi(t)^2 p_s(x,y).
+\end{xalignat}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliographystyle{unsrt}
+\bibliography{discretisation}
+\end{document}
