@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--timestepper",
-        choices=["implicit_euler", "imex_implicit_euler", "imex_ars232", "imex_ars443"],
+        choices=["implicit", "imex_implicit", "imex_ars232", "imex_ars443"],
         type=str,
         action="store",
         default="imex_ars232",
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         assert (
             not args.use_projection_method
         ), "Can not use projection method with conforming discretsation"
-        if args.timestepper == "implicit_euler":
+        if args.timestepper == "implicit":
             timestepper = IncompressibleEulerConformingImplicit(mesh, dt, args.flux)
         raise RuntimeError(
             "Invalid timestepping method for conforming discretisation: '{args.timestepper}'"
@@ -97,7 +97,7 @@ if __name__ == "__main__":
         assert (
             not args.use_projection_method
         ), "Can not use projection method with DG discretsation"
-        if args.timestepper == "implicit_euler":
+        if args.timestepper == "implicit":
             timestepper = IncompressibleEulerDGImplicit(mesh, args.degree, dt)
         else:
             raise RuntimeError(
@@ -105,7 +105,7 @@ if __name__ == "__main__":
             )
     elif args.discretisation == "hdg":
         # HDG discretisation
-        if args.timestepper == "implicit_euler":
+        if args.timestepper == "implicit":
             timestepper = IncompressibleEulerHDGImplicit(
                 mesh, args.degree, dt, args.flux, args.use_projection_method
             )
@@ -125,7 +125,7 @@ if __name__ == "__main__":
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
             )
-        elif args.timestepper == "imex_implicit_euler":
+        elif args.timestepper == "imex_implicit":
             timestepper = IncompressibleEulerHDGIMEXImplicit(
                 mesh,
                 args.degree,
