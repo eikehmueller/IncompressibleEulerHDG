@@ -3,7 +3,7 @@
 Implementation for several advanced discretisation methods and timestepping methods for the incompressible Euler equations.
 
 ## Overview
-The goal of this work is to implement higher order hybridisable DG discretisations in space and time for the incompressible Euler equations similar to what has been done in [Ueckermann and Lermusiaux (2016)](https://www.sciencedirect.com/science/article/pii/S0021999115007688?casa_token=aQP8a2IuX-MAAAAA:7KlvJnlSAoFO229d61uDrHxbyoJiYnoeE7laDV0pfrGDENnq4cmYVRGkXLTZuZnbmkX19hF_lQ) for the incompressible Navier Stokes equations. This is achieved by extending the methods in [Guzmán,Shu,Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false).
+The goal of this work is to implement higher order hybridisable DG discretisations in space and time for the incompressible Euler equations similar to what has been done in [Ueckermann and Lermusiaux (2016)](https://www.sciencedirect.com/science/article/pii/S0021999115007688?casa_token=aQP8a2IuX-MAAAAA:7KlvJnlSAoFO229d61uDrHxbyoJiYnoeE7laDV0pfrGDENnq4cmYVRGkXLTZuZnbmkX19hF_lQ) for the incompressible Navier Stokes equations. This is achieved by extending the methods in [Guzmán, Shu, Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false).
 
 ### Mathematical details
 
@@ -18,11 +18,11 @@ $$
 
 The code implements a range of numerical schemes:
 
-1. the **fully implicit** method based on a **conforming $\text{RT}_0\times \text{DG}_0$ discretisation** described in [Guzmán,Shu,Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [conforming_implicit.py](src/timesteppers/conforming_implicit.py).
-1. the **fully implicit** method based on a **$[\text{DG}_{k+1}]^2\times \text{DG}_k$ DG discretisation** also described in [Guzmán,Shu,Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [dg_implicit.py](src/timesteppers/dg_implicit.py)
-1. a **fully implicit hybridisable DG variant** of the fully implicit DG discretisation, see [hdg_implicit.py](src/timesteppers/hdg_implicit.py)
-1. a **hybridisable DG variant** of the DG discretisation which uses **Chorin's projection method** to split the implicit update into the computation of a tentative velocity followed by a pressure correction that enforces the divergence-free constraint on the velocity, see [hdg_implicit.py](src/timesteppers/hdg_implicit.py).
-1. a generalisation of the **hybridisable DG variant** to IMEX timesteppers. The computation of the update at each stage can be done either fully implicitly or with a Richardson iteration that is preconditioned with a projection method, [hdg_imex.py](src/timesteppers/hdg_imex.py).
+1. The **fully implicit** method based on a **conforming $\text{RT}_0\times \text{DG}_0$ discretisation** described in [Guzmán, Shu, Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [conforming_implicit.py](src/timesteppers/conforming_implicit.py).
+1. The **fully implicit** method based on a **$[\text{DG}_{k+1}]^2\times \text{DG}_k$ DG discretisation** also described in [Guzmán, Shu, Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [dg_implicit.py](src/timesteppers/dg_implicit.py)
+2. A **fully implicit hybridisable DG variant** of the fully implicit DG discretisation, see [hdg_implicit.py](src/timesteppers/hdg_implicit.py)
+3. A **hybridisable DG variant** of the DG discretisation which uses **Chorin's projection method** to split the implicit update into the computation of a tentative velocity followed by a pressure correction that enforces the divergence-free constraint on the velocity, see [hdg_implicit.py](src/timesteppers/hdg_implicit.py).
+4. A generalisation of the **hybridisable DG variant** to IMEX timesteppers. The computation of the update at each stage can be done either fully implicitly or with a Richardson iteration that is preconditioned with a projection method, [hdg_imex.py](src/timesteppers/hdg_imex.py).
 
 A stationary exact solution of the incompressible Euler equations in the domain $\Omega = [0,1]\times [0,1]$ is given by $f = 0$ and
 
