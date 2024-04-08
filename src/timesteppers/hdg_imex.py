@@ -11,6 +11,7 @@ __all__ = [
     "IncompressibleEulerHDGIMEXImplicit",
     "IncompressibleEulerHDGIMEXARS232",
     "IncompressibleEulerHDGIMEXARS443",
+    "IncompressibleEulerHDGIMEXSSP433",
 ]
 
 
@@ -451,7 +452,7 @@ class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
 
 
 class IncompressibleEulerHDGIMEXARS232(IncompressibleEulerHDGIMEX):
-    """IMEX ARS(2,3,2) timestepper for the incompressible Euler equations"""
+    """IMEX ARS2(2,3,2) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
         """Initialise new instance
@@ -463,7 +464,7 @@ class IncompressibleEulerHDGIMEXARS232(IncompressibleEulerHDGIMEX):
         :arg use_projection_method: use projection method instead of monolithic solve
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS(2,3,2)"
+            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS2(2,3,2)"
         )
         self.gamma = 1 - 1 / np.sqrt(2)
         self.delta = -2 / 3 * np.sqrt(2)
@@ -503,7 +504,7 @@ class IncompressibleEulerHDGIMEXARS232(IncompressibleEulerHDGIMEX):
 
 
 class IncompressibleEulerHDGIMEXARS443(IncompressibleEulerHDGIMEX):
-    """IMEX ARS(4,4,3) timestepper for the incompressible Euler equations"""
+    """IMEX ARS3(4,4,3) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
         """Initialise new instance
@@ -515,7 +516,7 @@ class IncompressibleEulerHDGIMEXARS443(IncompressibleEulerHDGIMEX):
         :arg use_projection_method: use projection method instead of monolithic solve
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS(4,4,3)"
+            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS3(4,4,3)"
         )
 
     @property
@@ -562,3 +563,67 @@ class IncompressibleEulerHDGIMEXARS443(IncompressibleEulerHDGIMEX):
     def _c_expl(self):
         """vector of length 5 with fractional times at which explicit term is evaluated"""
         return np.asarray([0, 1 / 2, 2 / 3, 1 / 2, 1])
+
+
+class IncompressibleEulerHDGIMEXSSP433(IncompressibleEulerHDGIMEX):
+    """IMEX SSP3(4,3,3) timestepper for the incompressible Euler equations"""
+
+    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+        """Initialise new instance
+
+        :arg mesh: underlying mesh
+        :arg degree: polynomial degree of pressure space
+        :arg dt: timestep size
+        :arg flux: numerical flux to use, either "upwind" or "centered"
+        :arg use_projection_method: use projection method instead of monolithic solve
+        """
+        super().__init__(
+            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX SSP3(4,3,3)"
+        )
+        self.alpha = 0.2416942608
+        self.beta = 0.0604235652
+        self.eta = 0.1291528696
+        self.delta = 1 / 2 - self.alpha - self.beta - self.eta
+
+    @property
+    def nstages(self):
+        return 4
+
+    @property
+    def _a_expl(self):
+        """4 x 4 matrix with explicit coefficients for intermediate stages"""
+        return np.asarray(
+            [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 1, 0, 0],
+                [0, 1 / 4, 1 / 4, 0],
+            ]
+        )
+
+    @property
+    def _a_impl(self):
+        """4 x 4 matrix with implicit coefficients for intermediate stages"""
+        return np.asarray(
+            [
+                [self.alpha, 0, 0, 0],
+                [-self.alpha, self.alpha, 0, 0],
+                [0, 1 - self.alpha, self.alpha, 0],
+                [self.beta, self.eta, self.delta, self.alpha],
+            ]
+        )
+
+    @property
+    def _b_expl(self):
+        """vector of length 4 with explicit coefficients for final stage"""
+        return np.asarray([0, 1 / 6, 1 / 6, 2 / 3])
+
+    @property
+    def _b_impl(self):
+        """vector of length 4 with implicit coefficients for final stage"""
+        return np.asarray([0, 1 / 6, 1 / 6, 2 / 3])
+
+    @property
+    def _c_expl(self):
+        """vector of length 4 with fractional times at which explicit term is evaluated"""
+        return np.asarray([0, 0, 1, 1 / 2])

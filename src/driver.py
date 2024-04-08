@@ -61,7 +61,13 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--timestepper",
-        choices=["implicit", "imex_implicit", "imex_ars232", "imex_ars443"],
+        choices=[
+            "implicit",
+            "imex_implicit",
+            "imex_ars232",
+            "imex_ars443",
+            "imex_ssp433",
+        ],
         type=str,
         action="store",
         default="imex_ars232",
@@ -119,6 +125,14 @@ if __name__ == "__main__":
             )
         elif args.timestepper == "imex_ars443":
             timestepper = IncompressibleEulerHDGIMEXARS443(
+                mesh,
+                args.degree,
+                dt,
+                flux=args.flux,
+                use_projection_method=args.use_projection_method,
+            )
+        elif args.timestepper == "imex_ssp433":
+            timestepper = IncompressibleEulerHDGIMEXSSP433(
                 mesh,
                 args.degree,
                 dt,
