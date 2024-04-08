@@ -333,7 +333,7 @@ However, to avoid re-evaluating $f^\impl$ and to ensure that corresponding terms
     \end{aligned}
     \label{eqn:imex_residual}
 \end{equation}
-Eq. \eqref{eqn:imex_implicit_solve} together with the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} is a linear equation for $(Q_i,p_i,\lambda_i)$. Instead of solving this linear equation in one go as in Section \ref{sec:hdg_implicit}, we might proceed in two stages by using the projection method from Section \ref{sec:split_hybridised} as a preconditioner for a Picard iteration.
+Eq. \eqref{eqn:imex_implicit_solve} together with the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} is a linear equation for $(Q_i,p_i,\lambda_i)$. Instead of solving this linear equation in one go as in Section \ref{sec:hdg_implicit}, we might proceed in two stages by using the projection method from Section \ref{sec:split_hybridised} as a preconditioner for a Richardson iteration.
 
 The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the calculation of the final residual in Eq. \eqref{eqn:final_residual} we again expressed $f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))$ in terms of $(Q_i\cdot w)_{\Omega_h}$ and $r_i(w)$, compare the manipulations that transform Eq. \eqref{eqn:imex_residual_preliminary} into Eq. \eqref{eqn:imex_residual}. The pressures $p'$ and $\lambda'$ that are computed when solving \eqref{eqn:final_update} are only required to ensure that $Q^{n+1}$ is divergence free.
 \begin{algorithm}
@@ -348,7 +348,7 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
         \State{Compute the residual $r_i(w)$ defined in Eq. \eqref{eqn:imex_residual}}
         \State{Set $Q^\star_{i-1}:=\mathcal{P}(Q_{i-1})$}
         \If {\textsf{use$\_$projection$\_$method}}
-        \State{Iteratively solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} with Alg. \ref{alg:picard}.}
+        \State{Iteratively solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} with Alg. \ref{alg:richardson}.}
         \Else
         \State{Solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} exactly in one step.}
         \EndIf
@@ -376,8 +376,8 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
     \end{algorithmic}
 \end{algorithm}
 \begin{algorithm}
-    \caption{Picard iteration. Approximately solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint}, using the projection method as a preconditioner with a fixed number of $N$ iterations.}
-    \label{alg:picard}
+    \caption{Preconditioned Richardson iteration. Approximately solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint}, using the projection method as a preconditioner with a fixed number of $N$ iterations.}
+    \label{alg:richardson}
     \begin{algorithmic}[1]
         \State{Initialise $Q_i^{(0)} = Q_{i-1}$, $p_i^{(0)} = p_{i-1}$, $\lambda_i^{(0)} := \lambda_{i-1}$.}
         \For {$k=1,2,\dots,N$}
