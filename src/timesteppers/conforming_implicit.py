@@ -20,7 +20,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         :arg dt: timestep size
         :arg flux: numerical flux (upwind or centered)
         """
-        super().__init__(mesh, 1, dt, label="ConformingImplicit")
+        super().__init__(mesh, 1, dt, label="Conforming Implicit")
         self.flux = flux
         assert self.flux in ["upwind", "centered"]
         # function spaces for velocity, pressure and trace variables

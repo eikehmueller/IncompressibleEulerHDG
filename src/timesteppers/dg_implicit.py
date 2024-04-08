@@ -20,7 +20,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         :arg degree: polynomial degree of pressure space
         :arg dt: timestep size
         """
-        super().__init__(mesh, degree, dt, label="DGImplicit")
+        super().__init__(mesh, degree, dt, label="DG Implicit")
         # penalty parameter
         self.alpha = 1
 

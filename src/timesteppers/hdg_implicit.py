@@ -23,7 +23,7 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
         """
-        super().__init__(mesh, degree, dt, label="HDGImplicit")
+        super().__init__(mesh, degree, dt, label="HDG Implicit")
         self.flux = flux
         assert self.flux in ["upwind", "centered"]
         self.use_projection_method = use_projection_method

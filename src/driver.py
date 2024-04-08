@@ -110,7 +110,7 @@ if __name__ == "__main__":
                 mesh, args.degree, dt, args.flux, args.use_projection_method
             )
         elif args.timestepper == "imex_ars232":
-            timestepper = IncompressibleEulerHDGARS232(
+            timestepper = IncompressibleEulerHDGIMEXARS232(
                 mesh,
                 args.degree,
                 dt,
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 use_projection_method=args.use_projection_method,
             )
         elif args.timestepper == "imex_implicit_euler":
-            timestepper = IncompressibleEulerHDGEuler(
+            timestepper = IncompressibleEulerHDGIMEXImplicit(
                 mesh,
                 args.degree,
                 dt,

@@ -8,8 +8,8 @@ from timesteppers.common import IncompressibleEuler
 
 __all__ = [
     "IncompressibleEulerHDGIMEX",
-    "IncompressibleEulerHDGEuler",
-    "IncompressibleEulerHDGARS232",
+    "IncompressibleEulerHDGIMEXImplicit",
+    "IncompressibleEulerHDGIMEXARS232",
 ]
 
 
@@ -90,11 +90,6 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 "pc_type": "lu",
                 "pc_factor_mat_solver_type": "mumps",
             }
-
-    @property
-    def label(self):
-        """Label of method"""
-        return self._label
 
     @property
     @abstractmethod
@@ -408,7 +403,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         return current_state.subfunctions[0], current_state.subfunctions[1]
 
 
-class IncompressibleEulerHDGEuler(IncompressibleEulerHDGIMEX):
+class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
     """IMEX implementation of the first order implicit method"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
@@ -421,7 +416,7 @@ class IncompressibleEulerHDGEuler(IncompressibleEulerHDGIMEX):
         :arg use_projection_method: use projection method instead of monolithic solve
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="IMEX Euler"
+            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX Implicit"
         )
 
     @property
@@ -454,7 +449,7 @@ class IncompressibleEulerHDGEuler(IncompressibleEulerHDGIMEX):
         return np.asarray([0, 1])
 
 
-class IncompressibleEulerHDGARS232(IncompressibleEulerHDGIMEX):
+class IncompressibleEulerHDGIMEXARS232(IncompressibleEulerHDGIMEX):
     """IMEX ARS(2,3,2) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
@@ -467,7 +462,7 @@ class IncompressibleEulerHDGARS232(IncompressibleEulerHDGIMEX):
         :arg use_projection_method: use projection method instead of monolithic solve
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="IMEX ARS(2,3,2)"
+            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS(2,3,2)"
         )
         self.gamma = 1 - 1 / np.sqrt(2)
         self.delta = -2 / 3 * np.sqrt(2)
