@@ -4,7 +4,7 @@ from abc import abstractmethod
 import tqdm
 
 from firedrake import *
-from timesteppers.common import IncompressibleEuler
+from timesteppers.common import *
 
 __all__ = [
     "IncompressibleEulerHDGIMEX",
@@ -92,6 +92,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 "pc_type": "lu",
                 "pc_factor_mat_solver_type": "mumps",
             }
+        self.niter_tentative = Averager()
+        self.niter_pressure = Averager()
 
     @property
     @abstractmethod
@@ -290,6 +292,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         z.subfunctions[2].interpolate(Constant(1))
         nullspace = VectorSpaceBasis([z])
         nullspace.orthonormalize()
+        self.niter_tentative.reset()
+        self.niter_pressure.reset()
         # loop over all timesteps
         for n in tqdm.tqdm(range(nt)):
             self._stage_state[0].assign(current_state)
@@ -322,11 +326,18 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             self._a_impl[i, i] * self._dt
                         ) * self._f_impl(w_Q, u_Q, self._Qstar[i - 1])
                         Q_tentative = Function(self._V_Q)
-                        solve(
-                            a_tentative == b_rhs_tentative,
-                            Q_tentative,
+                        problem_tentative = LinearVariationalProblem(
+                            a_tentative, b_rhs_tentative, Q_tentative
+                        )
+                        solver_tentative = LinearVariationalSolver(
+                            problem_tentative,
                             solver_parameters=self._tentative_velocity_solver_parameters,
                         )
+                        solver_tentative.solve()
+                        self.niter_tentative.update(
+                            solver_tentative.snes.getKSP().getIterationNumber()
+                        )
+
                         # step 2: compute (hybridised) pressure and velocity increment
                         a_mixed_poisson = (
                             inner(w, u) * dx
@@ -343,11 +354,20 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             - psi * inner(n_, Q_tentative) * ds
                         )
                         update = Function(self._V)
-                        solve(
-                            a_mixed_poisson == b_rhs_mixed_poisson,
-                            update,
+                        problem_mixed_poisson = LinearVariationalProblem(
+                            a_mixed_poisson, b_rhs_mixed_poisson, update
+                        )
+                        solver_mixed_poisson = LinearVariationalSolver(
+                            problem_mixed_poisson,
                             solver_parameters=self._pressure_solver_parameters,
                             nullspace=nullspace,
+                        )
+                        solver_mixed_poisson.solve()
+                        self.niter_pressure.update(
+                            solver_mixed_poisson.snes.getKSP()
+                            .getPC()
+                            .getPythonContext()
+                            .condensed_ksp.getIterationNumber()
                         )
                         # step 3: update velocity at current stage
                         self._shift_pressure(update)
@@ -401,7 +421,14 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         + Constant(self._b_impl[i])
                         * self._stage_state[i].subfunctions[idx]
                     )
-
+        if self.use_projection_method:
+            print()
+            print(
+                f"average number of tentative velocity solver iterations : {self.niter_tentative.value:8.2f}"
+            )
+            print(
+                f"average number of pressure solver iterations           : {self.niter_pressure.value:8.2f}"
+            )
         return current_state.subfunctions[0], current_state.subfunctions[1]
 
 
