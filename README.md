@@ -28,7 +28,7 @@ A stationary exact solution of the incompressible Euler equations in the domain 
 
 $$
 \begin{aligned}
-    Q_s(x,y) &= \begin{pmatrix}-C(x) S(y)\\S(x) C(y)\end{pmatrix}\\
+    Q_s(x,y) &= \left(-C(x) S(y),S(x) C(y)\right)^\top\\
     p_s(x,y) &= p_0 - C(x) C(y)
 \end{aligned}
 $$
