@@ -10,6 +10,7 @@ __all__ = [
     "IncompressibleEulerHDGIMEX",
     "IncompressibleEulerHDGIMEXImplicit",
     "IncompressibleEulerHDGIMEXARS232",
+    "IncompressibleEulerHDGIMEXARS443",
 ]
 
 
@@ -499,3 +500,65 @@ class IncompressibleEulerHDGIMEXARS232(IncompressibleEulerHDGIMEX):
     def _c_expl(self):
         """vector of length 3 with fractional times at which explicit term is evaluated"""
         return np.asarray([0, self.gamma, 1])
+
+
+class IncompressibleEulerHDGIMEXARS443(IncompressibleEulerHDGIMEX):
+    """IMEX ARS(4,4,3) timestepper for the incompressible Euler equations"""
+
+    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+        """Initialise new instance
+
+        :arg mesh: underlying mesh
+        :arg degree: polynomial degree of pressure space
+        :arg dt: timestep size
+        :arg flux: numerical flux to use, either "upwind" or "centered"
+        :arg use_projection_method: use projection method instead of monolithic solve
+        """
+        super().__init__(
+            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS(4,4,3)"
+        )
+
+    @property
+    def nstages(self):
+        return 5
+
+    @property
+    def _a_expl(self):
+        """5 x 5 matrix with explicit coefficients for intermediate stages"""
+        return np.asarray(
+            [
+                [0, 0, 0, 0, 0],
+                [1 / 2, 0, 0, 0, 0],
+                [11 / 18, 1 / 18, 0, 0, 0],
+                [5 / 6, -5 / 6, 1 / 2, 0, 0],
+                [1 / 4, 7 / 4, 3 / 4, -7 / 4, 0],
+            ]
+        )
+
+    @property
+    def _a_impl(self):
+        """5 x 5 matrix with implicit coefficients for intermediate stages"""
+        return np.asarray(
+            [
+                [0, 0, 0, 0, 0],
+                [0, 1 / 2, 0, 0, 0],
+                [0, 1 / 6, 1 / 2, 0, 0],
+                [0, -1 / 2, 1 / 2, 1 / 2, 0],
+                [0, 3 / 2, -3 / 2, 1 / 2, 1 / 2],
+            ]
+        )
+
+    @property
+    def _b_expl(self):
+        """vector of length 5 with explicit coefficients for final stage"""
+        return np.asarray([1 / 4, 7 / 4, 3 / 4, -7 / 4, 0])
+
+    @property
+    def _b_impl(self):
+        """vector of length 5 with implicit coefficients for final stage"""
+        return np.asarray([0, 3 / 2, -3, 2, 1 / 2, 1 / 2])
+
+    @property
+    def _c_expl(self):
+        """vector of length 5 with fractional times at which explicit term is evaluated"""
+        return np.asarray([0, 1 / 2, 2 / 3, 1 / 2, 1])
