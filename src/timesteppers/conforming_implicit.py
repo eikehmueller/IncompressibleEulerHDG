@@ -1,18 +1,24 @@
+# pylint: disable=wildcard-import,unused-wildcard-import
+
 import tqdm
 from firedrake import *
 from timesteppers.common import IncompressibleEuler
 
+__all__ = ["IncompressibleEulerConformingImplicit"]
+
 
 class IncompressibleEulerConformingImplicit(IncompressibleEuler):
-    """Solver for incompressible Euler equations based on
-    implicit conforming finite element method"""
+    """Solver for incompressible Euler equations based on implicit conforming finite element method
+
+    For details see Section 2.1 of Guzman et al. (2016).
+    """
 
     def __init__(self, mesh, dt, flux="upwind"):
         """Initialise new instance
 
         :arg mesh: underlying mesh
         :arg dt: timestep size
-        :arg flux: numerical flux
+        :arg flux: numerical flux (upwind or centered)
         """
         super().__init__(mesh, 1, dt, label="ConformingImplicit")
         self.flux = flux

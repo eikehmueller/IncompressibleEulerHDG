@@ -1,10 +1,18 @@
+# pylint: disable=wildcard-import,unused-wildcard-import
+
 import tqdm
 from firedrake import *
 from timesteppers.common import IncompressibleEuler
 
+__all__ = ["IncompressibleEulerHDGImplicit"]
+
 
 class IncompressibleEulerHDGImplicit(IncompressibleEuler):
-    """Solver for incompressible Euler equations based on HDG splitting method"""
+    """Solver for incompressible Euler equations based on HDG method
+
+    The solver is first order in time and it either uses a fully implicit method or
+    Chordin's projection method.
+    """
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
         """Initialise new instance

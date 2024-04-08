@@ -1,17 +1,12 @@
+# pylint: disable=wildcard-import,unused-wildcard-import
+
 import argparse
 from firedrake import *
 
-from timesteppers.conforming_implicit import (
-    IncompressibleEulerConformingImplicit,
-)
-from timesteppers.dg_implicit import IncompressibleEulerDGImplicit
-from timesteppers.hdg_implicit import (
-    IncompressibleEulerHDGImplicit,
-)
-from timesteppers.hdg_imex import (
-    IncompressibleEulerHDGARS232,
-    IncompressibleEulerHDGEuler,
-)
+from timesteppers.conforming_implicit import *
+from timesteppers.dg_implicit import *
+from timesteppers.hdg_implicit import *
+from timesteppers.hdg_imex import *
 
 #######################################################################################
 ##                                M A I N                                            ##
@@ -135,9 +130,9 @@ if __name__ == "__main__":
                 "Invalid timestepping method for HDG discretisation: '{args.timestepper}'"
             )
 
-    print(f"+---------------------------------------------+")
-    print(f"! IMEX-HDG for incompressible Euler equations !")
-    print(f"+---------------------------------------------+")
+    print("+-------------------------------------------------+")
+    print("! timesteppers for incompressible Euler equations !")
+    print("+-------------------------------------------------+")
     print()
     print(f"mesh size = {args.nx} x {args.nx}")
     print(f"polynomial degree = {args.degree}")

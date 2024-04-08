@@ -1,34 +1,4 @@
-"""IMEX HDG projection method for incompressible Euler equations
-
-The incompressible Euler equations are given by
-
-    dQ/dt + grad(p) + (Q.nabla) Q = f
-             div(Q) = 0
-
-The stationary exact solution is given by f = 0
-
-    Q_s(x,y) = (-C(x)*S(y),S(x)*C(y))
-    p_s(x,y) = p_0 - C(x)*C(y)
-
-where
-    S(z) = sin((z-1/2)*pi) 
-    C(z) = cos((z-1/2)*pi)
-
-From this a divergence free time-dependent solution can be constructed as
-
-    Q(x,y,t) = Psi(t)*Q_s(x,y)
-    p(x,y,t) = Psi(t)^2*p_s(x,y)
-
-and f = dPsi/dt * Q_s(x,y).
-
-Here we choose Psi(t) = exp(-kappa*t).
-
-The numerical scheme is an IMEX method which treats the forcing f explicitly and
-all other terms implicitly, approximating the requires solve by a two-stage HDG
-projection method: first, compute a tentative velocity and then update this to 
-obtain a divergence free velocity by solving a HDG discretisation of the mixed
-Poisson equation.
-"""
+# pylint: disable=wildcard-import,unused-wildcard-import
 
 from abc import abstractmethod
 import tqdm
@@ -36,10 +6,19 @@ import tqdm
 from firedrake import *
 from timesteppers.common import IncompressibleEuler
 
+__all__ = [
+    "IncompressibleEulerHDGIMEX",
+    "IncompressibleEulerHDGEuler",
+    "IncompressibleEulerHDGARS232",
+]
+
 
 class IncompressibleEulerHDGIMEX(IncompressibleEuler):
     """Abstract base class for IMEX timesteppers of incompressible Euler equation
-    based on the HDG projection method"""
+
+    At each stage, the update is either done fully implicitly or with a Richardson iteration
+    that is preconditioned by a two-stage update defined by a projection method.
+    """
 
     def __init__(
         self, mesh, degree, dt, flux="upwind", use_projection_method=True, label=None
@@ -61,8 +40,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.alpha = 1
         # stabilisation parameter
         self.tau = 1
-        # number pf Picard iterations
-        self._n_picard = 2
+        # number pf Richardson iterations
+        self._n_richardson = 2
 
         # function spaces for velocity, pressure and trace variables
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
@@ -329,8 +308,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     Q_i.assign(self._stage_state[i].subfunctions[0])
                     p_i.assign(self._stage_state[i].subfunctions[1])
                     lambda_i.assign(self._stage_state[i].subfunctions[2])
-                    # Picard iteration
-                    for _ in range(self._n_picard):
+                    # Richardson iteration
+                    for _ in range(self._n_richardson):
                         # Compute residual
                         b_rhs_tentative = (
                             rhs_i
@@ -430,8 +409,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
 
 
 class IncompressibleEulerHDGEuler(IncompressibleEulerHDGIMEX):
-    """IMEX version of implicit/explicit Euler timestepper of incompressible Euler
-    equation based on the HDG projection method"""
+    """IMEX implementation of the first order implicit method"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
         """Initialise new instance
@@ -477,7 +455,7 @@ class IncompressibleEulerHDGEuler(IncompressibleEulerHDGIMEX):
 
 
 class IncompressibleEulerHDGARS232(IncompressibleEulerHDGIMEX):
-    """ARS(2,3,2) timestepper of incompressible Euler equation based on the HDG projection method"""
+    """IMEX ARS(2,3,2) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
         """Initialise new instance

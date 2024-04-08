@@ -1,11 +1,24 @@
+"""Common functionality shared by all timesteppers for the incompressible Euler equations
+
+All timesteppers are expected to subclass the abstract subclass provided in this file.
+"""
+
+# pylint: disable=wildcard-import,unused-wildcard-import
+
 from abc import ABC, abstractmethod
 from firedrake import *
 import finat
 
+__all__ = ["IncompressibleEuler"]
+
 
 class IncompressibleEuler(ABC):
     """Abstract base class for timesteppers of incompressible Euler equation
-    based on the HDG projection method"""
+
+    Provides common functionality such as projection to the BDM subspace and an interface
+    for the solve method. Constructs a fields that stored 1/h_F on the trace space for the
+    stabilisation terms.
+    """
 
     def __init__(self, mesh, degree, dt, label=None):
         """Initialise new instance
@@ -65,7 +78,7 @@ class IncompressibleEuler(ABC):
         return self._label
 
     def project_bdm(self, Q):
-        """project velocity from DG space to BDM space.
+        """Project velocity from DG space to BDM space.
 
         After the projection the resulting velocity Q* has continuous normals
 

@@ -1,10 +1,17 @@
+# pylint: disable=wildcard-import,unused-wildcard-import
+
 import tqdm
 from firedrake import *
 from timesteppers.common import IncompressibleEuler
 
+__all__ = ["IncompressibleEulerDGImplicit"]
+
 
 class IncompressibleEulerDGImplicit(IncompressibleEuler):
-    """Solver for incompressible Euler equations based on HDG splitting method"""
+    """Solver for incompressible Euler equations based on implicit DG method
+
+    For details see Section 2.2 of Guzman et al. (2016).
+    """
 
     def __init__(self, mesh, degree, dt):
         """Initialise new instance
@@ -53,7 +60,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
             Q_star = self.project_bdm(Q)
 
             # Assemble weak form for the n+1's step
-            # Eq. (3.16) in [1], first equation
+            # Eq. (3.16) in Guzman et al. (2016), first equation
             momentum_eq_lhs = inner(v, w) * dx + self._dt * (
                 inner(outer(w, Q_star), grad(v)) * dx
                 + self.alpha
