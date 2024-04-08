@@ -18,11 +18,11 @@ $$
 
 The code implements a range of numerical schemes:
 
-1. The **fully implicit** method based on a **conforming $\text{RT}_0\times \text{DG}_0$ discretisation** described in [Guzmán, Shu, Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [conforming_implicit.py](src/timesteppers/conforming_implicit.py).
-1. The **fully implicit** method based on a **$[\text{DG}_{k+1}]^2\times \text{DG}_k$ DG discretisation** also described in [Guzmán, Shu, Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [dg_implicit.py](src/timesteppers/dg_implicit.py)
-2. A **fully implicit hybridisable DG variant** of the fully implicit DG discretisation, see [hdg_implicit.py](src/timesteppers/hdg_implicit.py)
-3. A **hybridisable DG variant** of the DG discretisation which uses **Chorin's projection method** to split the implicit update into the computation of a tentative velocity followed by a pressure correction that enforces the divergence-free constraint on the velocity, see [hdg_implicit.py](src/timesteppers/hdg_implicit.py).
-4. A generalisation of the **hybridisable DG variant** to IMEX timesteppers. The computation of the update at each stage can be done either fully implicitly or with a Richardson iteration that is preconditioned with a projection method, [hdg_imex.py](src/timesteppers/hdg_imex.py).
+1. The **fully implicit** method based on a **conforming $\text{RT}_0\times \text{DG}_0$ discretisation** described in [Guzmán, Shu, Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [conforming_implicit.py](tree/main/src/timesteppers/conforming_implicit.py).
+2. The **fully implicit** method based on a **$[\text{DG}_{k+1}]^2\times \text{DG}_k$ DG discretisation** also described in [Guzmán, Shu, Sequeira (2017)](https://academic.oup.com/imajna/article/37/4/1733/2670304?login=false), see [dg_implicit.py](tree/main/src/timesteppers/dg_implicit.py)
+3. A **fully implicit hybridisable DG variant** of the fully implicit DG discretisation, see [hdg_implicit.py](tree/main/src/timesteppers/hdg_implicit.py)
+4. A **hybridisable DG variant** of the DG discretisation which uses **Chorin's projection method** to split the implicit update into the computation of a tentative velocity followed by a pressure correction that enforces the divergence-free constraint on the velocity, see [hdg_implicit.py](tree/main/src/timesteppers/hdg_implicit.py).
+5. A generalisation of the **hybridisable DG variant** to IMEX timesteppers. The computation of the update at each stage can be done either fully implicitly or with a Richardson iteration that is preconditioned with a projection method, [hdg_imex.py](tree/main/src/timesteppers/hdg_imex.py).
 
 A stationary exact solution of the incompressible Euler equations in the domain $\Omega = [0,1]\times [0,1]$ is given by $f = 0$ and
 
