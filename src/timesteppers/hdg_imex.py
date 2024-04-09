@@ -66,26 +66,6 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             "pc_type": "ilu",
         }
         if self.use_projection_method:
-            self._pressure_solver_parameters = {
-                "mat_type": "matfree",
-                "ksp_type": "preonly",
-                "pc_type": "python",
-                "pc_python_type": "firedrake.SCPC",
-                "pc_sc_eliminate_fields": "0, 1",
-                "condensed_field": {
-                    "mat_type": "aij",
-                    "ksp_type": "cg",
-                    "ksp_rtol": 1.0e-12,
-                    "pc_type": "gamg",
-                    "pc_mg_log": None,
-                    "mg_levels": {
-                        "ksp_type": "chebyshev",
-                        "ksp_max_it": 2,
-                        "pc_type": "bjacobi",
-                        "sub_pc_type": "sor",
-                    },
-                },
-            }
 
             def get_coarse_space():
                 """Return coarse space, which is the lowest order conforming space P1"""
@@ -108,7 +88,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 V_coarse = get_coarse_space()
                 phi = TrialFunction(V_coarse)
                 psi = TestFunction(V_coarse)
-                return inner(grad(phi), grad(psi)) * dx
+                return -inner(grad(phi), grad(psi)) * dx
 
             # Application context that controls the GTMG preconditioner
             self._gtmgpc_appctx = {
