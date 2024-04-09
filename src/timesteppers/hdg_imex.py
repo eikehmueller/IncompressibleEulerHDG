@@ -86,6 +86,76 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     },
                 },
             }
+
+            def get_coarse_space():
+                """Return coarse space, which is the lowest order conforming space P1"""
+                return FunctionSpace(self._mesh, "CG", 1)
+
+            # Construct interpolation operator
+            V_coarse = get_coarse_space()
+            u = TrialFunction(self._V_trace)
+            u_coarse = TrialFunction(V_coarse)
+            w = TestFunction(self._V_trace)
+            a_mass = u("+") * w("+") * dS + u * w * ds
+            a_proj = 2 * avg(u_coarse) * w("+") * dS + u_coarse * w * ds
+            a_proj_mat = assemble(a_proj, mat_type="aij").M.handle
+            a_mass_inv = assemble(Tensor(a_mass).inv, mat_type="aij")
+            a_mass_inv_mat = a_mass_inv.M.handle
+            interpolation_matrix = a_mass_inv_mat.matMult(a_proj_mat)
+
+            def get_coarse_operator():
+                """Return operator on coarse space which is the weak Laplace operator"""
+                V_coarse = get_coarse_space()
+                phi = TrialFunction(V_coarse)
+                psi = TestFunction(V_coarse)
+                return inner(grad(phi), grad(psi)) * dx
+
+            # Application context that controls the GTMG preconditioner
+            self._gtmgpc_appctx = {
+                "get_coarse_operator": get_coarse_operator,
+                "get_coarse_space": get_coarse_space,
+                "interpolation_matrix": interpolation_matrix,
+            }
+            self._pressure_solver_parameters = {
+                "mat_type": "matfree",
+                "ksp_type": "preonly",
+                "pc_type": "python",
+                "pc_python_type": "firedrake.SCPC",
+                "pc_sc_eliminate_fields": "0, 1",
+                "condensed_field": {
+                    "mat_type": "aij",
+                    "ksp_type": "cg",
+                    "ksp_rtol": 1.0e-12,
+                    "pc_type": "python",
+                    "pc_python_type": "firedrake.GTMGPC",
+                    "pc_mg_log": None,
+                    "gt": {
+                        "mat_type": "aij",
+                        "mg_levels": {
+                            "ksp_type": "chebyshev",
+                            "pc_type": "bjacobi",
+                            "sub_pc_type": "sor",
+                            "ksp_max_it": 2,
+                        },
+                        "mg_coarse": {
+                            "ksp_type": "preonly",
+                            "pc_type": "gamg",
+                            "ksp_rtol": 1.0e-12,
+                            "pc_mg_cycles": "v",
+                            "mg_levels": {
+                                "ksp_type": "chebyshev",
+                                "ksp_max_it": 2,
+                                "sub_pc_type": "sor",
+                            },
+                            "mg_coarse": {
+                                "ksp_type": "chebyshev",
+                                "ksp_max_it": 2,
+                                "sub_pc_type": "sor",
+                            },
+                        },
+                    },
+                },
+            }
         else:
             self._pressure_solver_parameters = {
                 "ksp_type": "gmres",
@@ -361,6 +431,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             problem_mixed_poisson,
                             solver_parameters=self._pressure_solver_parameters,
                             nullspace=nullspace,
+                            appctx=self._gtmgpc_appctx,
                         )
                         solver_mixed_poisson.solve()
                         self.niter_pressure.update(
