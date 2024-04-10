@@ -105,6 +105,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 "condensed_field": {
                     "mat_type": "aij",
                     "ksp_type": "cg",
+                    # "ksp_monitor": None,
                     "ksp_rtol": 1.0e-12,
                     "pc_type": "python",
                     "pc_python_type": "firedrake.GTMGPC",
@@ -144,6 +145,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             }
         self.niter_tentative = Averager()
         self.niter_pressure = Averager()
+        self.niter_final_pressure = Averager()
 
     @property
     @abstractmethod
@@ -344,6 +346,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         nullspace.orthonormalize()
         self.niter_tentative.reset()
         self.niter_pressure.reset()
+        self.niter_final_pressure.reset()
         # loop over all timesteps
         for n in tqdm.tqdm(range(nt)):
             self._stage_state[0].assign(current_state)
@@ -458,9 +461,24 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 - self._pressure_gradient(w, phi, lmbda)
                 + self._Gamma(psi, mu, u, phi, lmbda)
             )
-            solve(
-                a_final == self._final_residual(w, f_rhs, tn),
+            b_final = self._final_residual(w, f_rhs, tn)
+            problem_mixed_poisson_final = LinearVariationalProblem(
+                a_final,
+                b_final,
                 current_state,
+            )
+            solver_mixed_poisson_final = LinearVariationalSolver(
+                problem_mixed_poisson_final,
+                solver_parameters=self._pressure_solver_parameters,
+                nullspace=nullspace,
+                appctx=self._gtmgpc_appctx,
+            )
+            solver_mixed_poisson_final.solve()
+            self.niter_final_pressure.update(
+                solver_mixed_poisson_final.snes.getKSP()
+                .getPC()
+                .getPythonContext()
+                .condensed_ksp.getIterationNumber()
             )
 
             # Add pressures from stages
@@ -480,6 +498,9 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             print(
                 f"average number of pressure solver iterations           : {self.niter_pressure.value:8.2f}"
             )
+        print(
+            f"average number of final pressure solver iterations     : {self.niter_final_pressure.value:8.2f}"
+        )
         return current_state.subfunctions[0], current_state.subfunctions[1]
 
 
