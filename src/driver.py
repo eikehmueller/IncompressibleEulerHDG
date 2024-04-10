@@ -2,6 +2,7 @@
 
 import argparse
 from firedrake import *
+from firedrake.output import VTKFile
 
 from timesteppers.conforming_implicit import *
 from timesteppers.dg_implicit import *
@@ -214,5 +215,5 @@ if __name__ == "__main__":
     b_hdiv_projection = div(Q) * psi * dx
     solve(a_mass == b_hdiv_projection, divQ)
 
-    outfile = File("solution.pvd")
+    outfile = VTKFile("solution.pvd")
     outfile.write(Q, Q_exact, Q_error, p, p_exact, p_error, divQ)
