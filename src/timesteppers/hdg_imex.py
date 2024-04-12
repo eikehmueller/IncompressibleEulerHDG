@@ -1,6 +1,7 @@
 # pylint: disable=wildcard-import,unused-wildcard-import
 
 from abc import abstractmethod
+from functools import cached_property
 import tqdm
 
 from firedrake import *
@@ -60,89 +61,6 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             if k < self.nstages - 1:
                 self._Qstar.append(Function(self._V_Q))
 
-        # solver parameters
-        self._tentative_velocity_solver_parameters = {
-            "ksp_type": "gmres",
-            "pc_type": "ilu",
-        }
-        if self.use_projection_method:
-
-            def get_coarse_space():
-                """Return coarse space, which is the lowest order conforming space P1"""
-                return FunctionSpace(self._mesh, "CG", 1)
-
-            # Construct interpolation operator
-            V_coarse = get_coarse_space()
-            u = TrialFunction(self._V_trace)
-            u_coarse = TrialFunction(V_coarse)
-            w = TestFunction(self._V_trace)
-            a_mass = u("+") * w("+") * dS + u * w * ds
-            a_proj = 2 * avg(u_coarse) * w("+") * dS + u_coarse * w * ds
-            a_proj_mat = assemble(a_proj, mat_type="aij").M.handle
-            a_mass_inv = assemble(Tensor(a_mass).inv, mat_type="aij")
-            a_mass_inv_mat = a_mass_inv.M.handle
-            interpolation_matrix = a_mass_inv_mat.matMult(a_proj_mat)
-
-            def get_coarse_operator():
-                """Return operator on coarse space which is the weak Laplace operator"""
-                V_coarse = get_coarse_space()
-                phi = TrialFunction(V_coarse)
-                psi = TestFunction(V_coarse)
-                return -inner(grad(phi), grad(psi)) * dx
-
-            # Application context that controls the GTMG preconditioner
-            self._gtmgpc_appctx = {
-                "get_coarse_operator": get_coarse_operator,
-                "get_coarse_space": get_coarse_space,
-                "interpolation_matrix": interpolation_matrix,
-            }
-            self._pressure_solver_parameters = {
-                "mat_type": "matfree",
-                "ksp_type": "preonly",
-                "pc_type": "python",
-                "pc_python_type": "firedrake.SCPC",
-                "pc_sc_eliminate_fields": "0, 1",
-                "condensed_field": {
-                    "mat_type": "aij",
-                    "ksp_type": "cg",
-                    # "ksp_monitor": None,
-                    "ksp_rtol": 1.0e-12,
-                    "pc_type": "python",
-                    "pc_python_type": "firedrake.GTMGPC",
-                    "pc_mg_log": None,
-                    "gt": {
-                        "mat_type": "aij",
-                        "mg_levels": {
-                            "ksp_type": "chebyshev",
-                            "pc_type": "bjacobi",
-                            "sub_pc_type": "sor",
-                            "ksp_max_it": 2,
-                        },
-                        "mg_coarse": {
-                            "ksp_type": "preonly",
-                            "pc_type": "gamg",
-                            "ksp_rtol": 1.0e-12,
-                            "pc_mg_cycles": "v",
-                            "mg_levels": {
-                                "ksp_type": "chebyshev",
-                                "ksp_max_it": 2,
-                                "sub_pc_type": "sor",
-                            },
-                            "mg_coarse": {
-                                "ksp_type": "chebyshev",
-                                "ksp_max_it": 2,
-                                "sub_pc_type": "sor",
-                            },
-                        },
-                    },
-                },
-            }
-        else:
-            self._pressure_solver_parameters = {
-                "ksp_type": "gmres",
-                "pc_type": "lu",
-                "pc_factor_mat_solver_type": "mumps",
-            }
         self.niter_tentative = Averager()
         self.niter_pressure = Averager()
         self.niter_final_pressure = Averager()
@@ -311,6 +229,122 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         state.subfunctions[1].assign(state.subfunctions[1] - p_shift)
         state.subfunctions[2].assign(state.subfunctions[2] - p_shift)
 
+    @cached_property
+    def nullspace(self):
+        """Nullspace for pressure solve"""
+        z = Function(self._V)
+        z.subfunctions[0].interpolate(as_vector([Constant(0), Constant(0)]))
+        z.subfunctions[1].interpolate(Constant(1))
+        z.subfunctions[2].interpolate(Constant(1))
+        _nullspace = VectorSpaceBasis([z])
+        _nullspace.orthonormalize()
+        return _nullspace
+
+    @cached_property
+    def interpolation_matrix(self):
+        """Interpolation matrix for GTMG"""
+        V_coarse = FunctionSpace(self._mesh, "CG", 1)
+        u = TrialFunction(self._V_trace)
+        u_coarse = TrialFunction(V_coarse)
+        w = TestFunction(self._V_trace)
+        a_mass = u("+") * w("+") * dS + u * w * ds
+        a_proj = 2 * avg(u_coarse) * w("+") * dS + u_coarse * w * ds
+        a_proj_mat = assemble(a_proj, mat_type="aij").M.handle
+        a_mass_inv = assemble(Tensor(a_mass).inv, mat_type="aij")
+        a_mass_inv_mat = a_mass_inv.M.handle
+        return a_mass_inv_mat.matMult(a_proj_mat)
+
+    def pressure_solve(self, state, b_rhs):
+        """Solve the hybridised mixed system for the pressure
+
+        Returns the number of iterations required for the solve
+
+        :arg state: mixed function to write the result to
+        :arg b_rhs: 1-form for right hand side
+        """
+
+        def get_coarse_space():
+            """Return coarse space, which is the lowest order conforming space P1"""
+            return FunctionSpace(self._mesh, "CG", 1)
+
+        def get_coarse_operator():
+            """Return operator on coarse space which is the weak Laplace operator"""
+            V_coarse = get_coarse_space()
+            phi = TrialFunction(V_coarse)
+            psi = TestFunction(V_coarse)
+            return -inner(grad(phi), grad(psi)) * dx
+
+        # Application context that controls the GTMG preconditioner
+        appctx = {
+            "get_coarse_operator": get_coarse_operator,
+            "get_coarse_space": get_coarse_space,
+            "interpolation_matrix": self.interpolation_matrix,
+        }
+
+        u, phi, lmbda = TrialFunctions(self._V)
+        w, psi, mu = TestFunctions(self._V)
+
+        a_mixed_poisson = (
+            inner(w, u) * dx
+            - self._pressure_gradient(w, phi, lmbda)
+            + self._Gamma(psi, mu, u, phi, lmbda)
+        )
+        problem_mixed_poisson = LinearVariationalProblem(a_mixed_poisson, b_rhs, state)
+        solver_parameters = {
+            "mat_type": "matfree",
+            "ksp_type": "preonly",
+            "pc_type": "python",
+            "pc_python_type": "firedrake.SCPC",
+            "pc_sc_eliminate_fields": "0, 1",
+            "condensed_field": {
+                "mat_type": "aij",
+                "ksp_type": "cg",
+                "ksp_rtol": 1.0e-12,
+                "pc_type": "python",
+                "pc_python_type": "firedrake.GTMGPC",
+                "pc_mg_log": None,
+                "gt": {
+                    "mat_type": "aij",
+                    "mg_levels": {
+                        "ksp_type": "chebyshev",
+                        "pc_type": "bjacobi",
+                        "sub_pc_type": "sor",
+                        "ksp_max_it": 2,
+                    },
+                    "mg_coarse": {
+                        "ksp_type": "preonly",
+                        "pc_type": "gamg",
+                        "ksp_rtol": 1.0e-12,
+                        "pc_mg_cycles": "v",
+                        "mg_levels": {
+                            "ksp_type": "chebyshev",
+                            "ksp_max_it": 2,
+                            "sub_pc_type": "sor",
+                        },
+                        "mg_coarse": {
+                            "ksp_type": "chebyshev",
+                            "ksp_max_it": 2,
+                            "sub_pc_type": "sor",
+                        },
+                    },
+                },
+            },
+        }
+        solver_mixed_poisson = LinearVariationalSolver(
+            problem_mixed_poisson,
+            solver_parameters=solver_parameters,
+            nullspace=self.nullspace,
+            appctx=appctx,
+        )
+        solver_mixed_poisson.solve()
+        its = (
+            solver_mixed_poisson.snes.getKSP()
+            .getPC()
+            .getPythonContext()
+            .condensed_ksp.getIterationNumber()
+        )
+        return its
+
     def solve(self, Q_initial, p_initial, f_rhs, T_final):
         """Propagate solution forward in time for a given initial velocity and pressure
 
@@ -338,12 +372,6 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         w_Q = TestFunction(self._V_Q)
         u, phi, lmbda = TrialFunctions(self._V)
         w, psi, mu = TestFunctions(self._V)
-        z = Function(self._V)
-        z.subfunctions[0].interpolate(as_vector([Constant(0), Constant(0)]))
-        z.subfunctions[1].interpolate(Constant(1))
-        z.subfunctions[2].interpolate(Constant(1))
-        nullspace = VectorSpaceBasis([z])
-        nullspace.orthonormalize()
         self.niter_tentative.reset()
         self.niter_pressure.reset()
         self.niter_final_pressure.reset()
@@ -382,21 +410,19 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         problem_tentative = LinearVariationalProblem(
                             a_tentative, b_rhs_tentative, Q_tentative
                         )
+                        solver_parameters = {
+                            "ksp_type": "gmres",
+                            "pc_type": "ilu",
+                        }
                         solver_tentative = LinearVariationalSolver(
                             problem_tentative,
-                            solver_parameters=self._tentative_velocity_solver_parameters,
+                            solver_parameters=solver_parameters,
                         )
                         solver_tentative.solve()
                         self.niter_tentative.update(
                             solver_tentative.snes.getKSP().getIterationNumber()
                         )
-
                         # step 2: compute (hybridised) pressure and velocity increment
-                        a_mixed_poisson = (
-                            inner(w, u) * dx
-                            - self._pressure_gradient(w, phi, lmbda)
-                            + self._Gamma(psi, mu, u, phi, lmbda)
-                        )
                         n_ = FacetNormal(self._mesh)
                         b_rhs_mixed_poisson = Constant(
                             -1 / (self._a_impl[i, i] * self._dt)
@@ -407,22 +433,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             - psi * inner(n_, Q_tentative) * ds
                         )
                         update = Function(self._V)
-                        problem_mixed_poisson = LinearVariationalProblem(
-                            a_mixed_poisson, b_rhs_mixed_poisson, update
-                        )
-                        solver_mixed_poisson = LinearVariationalSolver(
-                            problem_mixed_poisson,
-                            solver_parameters=self._pressure_solver_parameters,
-                            nullspace=nullspace,
-                            appctx=self._gtmgpc_appctx,
-                        )
-                        solver_mixed_poisson.solve()
-                        self.niter_pressure.update(
-                            solver_mixed_poisson.snes.getKSP()
-                            .getPC()
-                            .getPythonContext()
-                            .condensed_ksp.getIterationNumber()
-                        )
+                        its = self.pressure_solve(update, b_rhs_mixed_poisson)
+                        self.niter_pressure.update(its)
                         # step 3: update velocity at current stage
                         self._shift_pressure(update)
                         Q_i.assign(
@@ -451,35 +463,15 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     solve(
                         a_implicit == self._residual(w, f_rhs, i, tn),
                         self._stage_state[i],
-                        solver_parameters=self._pressure_solver_parameters,
-                        nullspace=nullspace,
+                        solver_parameters={
+                            "ksp_type": "gmres",
+                            "pc_type": "lu",
+                            "pc_factor_mat_solver_type": "mumps",
+                        },
+                        nullspace=self.nullspace,
                     )
-
-            # compute velocity and (hybridised) pressure at next time step
-            a_final = (
-                inner(w, u) * dx
-                - self._pressure_gradient(w, phi, lmbda)
-                + self._Gamma(psi, mu, u, phi, lmbda)
-            )
-            b_final = self._final_residual(w, f_rhs, tn)
-            problem_mixed_poisson_final = LinearVariationalProblem(
-                a_final,
-                b_final,
-                current_state,
-            )
-            solver_mixed_poisson_final = LinearVariationalSolver(
-                problem_mixed_poisson_final,
-                solver_parameters=self._pressure_solver_parameters,
-                nullspace=nullspace,
-                appctx=self._gtmgpc_appctx,
-            )
-            solver_mixed_poisson_final.solve()
-            self.niter_final_pressure.update(
-                solver_mixed_poisson_final.snes.getKSP()
-                .getPC()
-                .getPythonContext()
-                .condensed_ksp.getIterationNumber()
-            )
+            its = self.pressure_solve(current_state, self._final_residual(w, f_rhs, tn))
+            self.niter_final_pressure.update(its)
 
             # Add pressures from stages
             for idx in (1, 2):
