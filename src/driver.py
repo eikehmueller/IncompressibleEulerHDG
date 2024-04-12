@@ -1,5 +1,7 @@
 # pylint: disable=wildcard-import,unused-wildcard-import
 
+import sys
+import time
 import argparse
 from firedrake import *
 from firedrake.output import VTKFile
@@ -73,6 +75,13 @@ if __name__ == "__main__":
         action="store",
         default="imex_ars232",
         help="timestepper",
+    )
+
+    parser.add_argument(
+        "--test_pressure_solver",
+        action="store_true",
+        default=False,
+        help="carry out a single solve with the pressure solver for testing",
     )
 
     args = parser.parse_args()
@@ -178,6 +187,23 @@ if __name__ == "__main__":
     )
     p_stationary = (sin((x - 1 / 2) * pi) ** 2 + sin((y - 1 / 2) * pi) ** 2) / 2
     f_rhs = lambda t: -kappa * exp(-kappa * t) * Q_stationary
+
+    if args.test_pressure_solver:
+        pcg = PCG64(seed=123456789)
+        rg = RandomGenerator(pcg)
+        f_Q = rg.normal(timestepper._V_Q, 0.0, 1.0)
+        w, _, __ = TestFunctions(timestepper._V)
+        state = Function(timestepper._V)
+        b_rhs = inner(f_Q, w) * dx
+        print("=== Testing pressure solver")
+        print()
+        _ = timestepper.pressure_solve(state, b_rhs)
+        t_start = time.perf_counter()
+        its = timestepper.pressure_solve(state, b_rhs)
+        t_finish = time.perf_counter()
+        print(f"    solve time           = {t_finish-t_start:12.4f} s")
+        print(f"    number of iterations = {its}")
+        sys.exit()
 
     Q, p = timestepper.solve(Q_stationary, p_stationary, f_rhs, t_final)
 
