@@ -248,7 +248,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         u_coarse = TrialFunction(V_coarse)
         w = TestFunction(self._V_trace)
         a_mass = u("+") * w("+") * dS + u * w * ds
-        a_proj = 2 * avg(u_coarse) * w("+") * dS + u_coarse * w * ds
+        a_proj = 0.5 * avg(u_coarse) * w("+") * dS + u_coarse * w * ds
         a_proj_mat = assemble(a_proj, mat_type="aij").M.handle
         a_mass_inv = assemble(Tensor(a_mass).inv, mat_type="aij")
         a_mass_inv_mat = a_mass_inv.M.handle
