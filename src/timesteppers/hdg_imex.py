@@ -307,14 +307,17 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     "mat_type": "aij",
                     "mg_levels": {
                         "ksp_type": "chebyshev",
-                        "pc_type": "bjacobi",
-                        "sub_pc_type": "sor",
+                        "pc_type": "python",
+                        "pc_python_type": "firedrake.ASMStarPC",
+                        "pc_star_construct_dim": 1,
+                        "pc_star_patch_local_type": "additive",
+                        "pc_star_patch_sub_ksp_type": "preonly",
+                        "pc_star_patch_sub_pc_type": "lu",
                         "ksp_max_it": 2,
                     },
                     "mg_coarse": {
                         "ksp_type": "preonly",
                         "pc_type": "gamg",
-                        "ksp_rtol": 1.0e-12,
                         "pc_mg_cycles": "v",
                         "mg_levels": {
                             "ksp_type": "chebyshev",
