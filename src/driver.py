@@ -198,6 +198,7 @@ if __name__ == "__main__":
         print("=== Testing pressure solver")
         print()
         _ = timestepper.pressure_solve(state, b_rhs)
+        state.assign(0)
         t_start = time.perf_counter()
         its = timestepper.pressure_solve(state, b_rhs)
         t_finish = time.perf_counter()
