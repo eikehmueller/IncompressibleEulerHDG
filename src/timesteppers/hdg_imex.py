@@ -485,17 +485,17 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         + Constant(self._b_impl[i])
                         * self._stage_state[i].subfunctions[idx]
                     )
+        print(
+            f"average number of tentative velocity solver iterations : {self.niter_tentative.value:8.2f}"
+        )
         if self.use_projection_method:
             print()
             print(
-                f"average number of tentative velocity solver iterations : {self.niter_tentative.value:8.2f}"
-            )
-            print(
                 f"average number of pressure solver iterations           : {self.niter_pressure.value:8.2f}"
             )
-        print(
-            f"average number of final pressure solver iterations     : {self.niter_final_pressure.value:8.2f}"
-        )
+            print(
+                f"average number of final pressure solver iterations     : {self.niter_final_pressure.value:8.2f}"
+            )
         return current_state.subfunctions[0], current_state.subfunctions[1]
 
 
