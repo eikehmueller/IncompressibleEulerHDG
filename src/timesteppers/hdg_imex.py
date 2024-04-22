@@ -298,7 +298,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             "pc_sc_eliminate_fields": "0, 1",
             "condensed_field": {
                 "mat_type": "aij",
-                "ksp_type": "cg",
+                "ksp_type": "gmres",
                 "ksp_rtol": 1.0e-12,
                 "pc_type": "python",
                 "pc_python_type": "firedrake.GTMGPC",
