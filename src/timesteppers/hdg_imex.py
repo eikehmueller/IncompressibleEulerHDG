@@ -478,13 +478,10 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
 
             # Add pressures from stages
             for idx in (1, 2):
-                current_state.subfunctions[idx].assign(0)
-                for i in range(1, self.nstages):
-                    current_state.subfunctions[idx].assign(
-                        current_state.subfunctions[idx]
-                        + Constant(self._b_impl[i])
-                        * self._stage_state[i].subfunctions[idx]
-                    )
+                current_state.subfunctions[idx].assign(
+                    self._stage_state[self.nstages - 1].subfunctions[idx]
+                )
+
         print(
             f"average number of tentative velocity solver iterations : {self.niter_tentative.value:8.2f}"
         )

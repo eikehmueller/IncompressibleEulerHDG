@@ -300,7 +300,7 @@ Note that $g(w,p,\lambda)$ in Eqs. \eqref{eqn:time_evolution}, \eqref{eqn:imex_p
 Restricting ourselves to the special case $b_0^\impl=a_{i,0}^\impl=0$, an $s$-stage IMEX-RK scheme is given by: find $(Q^{n+1},p^{n+1},\lambda^{n+1})\in V_Q\times V_p\times V_{\text{trace}}$ such that
 \begin{equation}
     \begin{aligned}
-        (w\cdot Q^{n+1})_{\Omega_h} & = (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{i=1}^{s-1} b_i^\impl f^\impl(w,Q_i,\mathcal{P}(Q_{i-1})) \\&\qquad +\Delta t \sum_{i=0}^{s-1} b_i^\expl f^\expl(w;t^n+c_i \Delta t)+\Delta t\; g(w,p^{n+1},\lambda^{n+1})
+        (w\cdot Q^{n+1})_{\Omega_h} & = (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{i=1}^{s-1} b_i^\impl \left(f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))+g(w,p_i,\lambda_i)\right) \\&\qquad +\Delta t \sum_{i=0}^{s-1} b_i^\expl f^\expl(w;t^n+c_i \Delta t)+\Delta t\; g(w,p^{n+1},\lambda^{n+1})
     \end{aligned}\label{eqn:Q_nplus1_equation}
 \end{equation}
 subject to the constraint
@@ -322,11 +322,11 @@ with $Q_0=Q^n$, $p_0=p^n$ subject to the constraint
 At each stage the residual $r_i$ is a one-form defined by
 \begin{equation}
     \begin{aligned}
-        r_i(w) & := (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{j=1}^{i-1} a_{i,j}^\impl f^\impl(w,Q_j,\mathcal{P}(Q_{j-1})) +\Delta t \sum_{j=0}^{i-1}a_{i,j}^\expl f^\expl(w;t^n+c_j \Delta t).
+        r_i(w) & := (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{j=1}^{i-1} a_{i,j}^\impl \left(f^\impl(w,Q_j,\mathcal{P}(Q_{j-1}))+g(w,p_i,\lambda_i)\right) +\Delta t \sum_{j=0}^{i-1}a_{i,j}^\expl f^\expl(w;t^n+c_j \Delta t).
     \end{aligned}
     \label{eqn:imex_residual_preliminary}
 \end{equation}
-However, to avoid re-evaluating $f^\impl$ and to ensure that corresponding terms cancel in the projection method, we use Eq. \eqref{eqn:imex_implicit_solve} to express $f^\impl(w,Q_j,\mathcal{P}(Q_{j-1}))$ in terms of $(Q_j\cdot w)_{\Omega_h}$ and $r_j(w)$. Note that the contribution from the pressure gradient $g(w,p_j,\lambda_j)$ is irrelevant since can be absorbed into a redefinition of the pressure $p_i$, $\lambda_i$ that appears on the left hand side of Eq. \eqref{eqn:imex_implicit_solve}. With this, we arrive at the following recursive definition of the residual in Eq. \eqref{eqn:imex_residual_preliminary}
+However, to avoid re-evaluating $f^\impl$ and to ensure that corresponding terms cancel in the projection method, we use Eq. \eqref{eqn:imex_implicit_solve} to express $f^\impl(w,Q_j,\mathcal{P}(Q_{j-1}))$ in terms of $(Q_j\cdot w)_{\Omega_h}$ and $r_j(w)$. With this, we arrive at the following recursive definition of the residual in Eq. \eqref{eqn:imex_residual_preliminary}
 \begin{equation}
     \begin{aligned}
         r_i(w) & := (w\cdot Q^n)_{\Omega_h} + \sum_{j=1}^{i-1} \frac{a_{i,j}^\impl}{a_{j,j}^\impl} \big((Q_j\cdot w)_{\Omega_h}-r_j(w)\big) +\Delta t \sum_{j=0}^{i-1}a_{i,j}^\expl f^\expl(w;t^n+c_j \Delta t).
@@ -370,8 +370,8 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
         \end{equation}
         \State{Compute the (hybridised) pressure at the next timestep as
             \begin{xalignat}{2}
-                p^{n+1} &= \sum_{i=1}^{s-1}  b_i^\impl p_i, &
-                \lambda^{n+1} &= \sum_{i=1}^{s-1} b_i^\impl \lambda_i
+                p^{n+1} &= p_{s-1}, &
+                \lambda^{n+1} &= \lambda_{s-1}
             \end{xalignat}}
     \end{algorithmic}
 \end{algorithm}
