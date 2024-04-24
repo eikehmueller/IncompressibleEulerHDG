@@ -274,10 +274,15 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             psi = TestFunction(V_coarse)
             return -inner(grad(phi), grad(psi)) * dx
 
+        def get_coarse_op_nullspace():
+            """Nullspace of coarse operator"""
+            return VectorSpaceBasis(constant=True, comm=COMM_WORLD)
+
         # Application context that controls the GTMG preconditioner
         appctx = {
             "get_coarse_operator": get_coarse_operator,
             "get_coarse_space": get_coarse_space,
+            "get_coarse_op_nullspace": get_coarse_op_nullspace,
             "interpolation_matrix": self.interpolation_matrix,
         }
 
