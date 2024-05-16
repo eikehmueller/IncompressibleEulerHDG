@@ -478,6 +478,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         },
                         nullspace=self.nullspace,
                     )
+                self._shift_pressure(self._stage_state[i])
             its = self.pressure_solve(current_state, self._final_residual(w, f_rhs, tn))
             self.niter_final_pressure.update(its)
 
