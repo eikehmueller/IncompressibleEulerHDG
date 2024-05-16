@@ -186,7 +186,10 @@ if __name__ == "__main__":
         ]
     )
     p_stationary = (sin((x - 1 / 2) * pi) ** 2 + sin((y - 1 / 2) * pi) ** 2) / 2
-    f_rhs = lambda t: -kappa * exp(-kappa * t) * Q_stationary
+    if kappa == 0:
+        f_rhs = 0
+    else:
+        f_rhs = lambda t: -kappa * exp(-kappa * t) * Q_stationary
 
     if args.test_pressure_solver:
         pcg = PCG64(seed=123456789)

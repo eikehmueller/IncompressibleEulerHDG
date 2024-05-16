@@ -155,7 +155,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 )
         # explicit contributions
         for j in range(i):
-            if self._a_expl[i, j] != 0:
+            if (f_rhs != 0) and (self._a_expl[i, j] != 0):
                 r_form += (
                     Constant(self._dt * self._a_expl[i, j])
                     * inner(
@@ -186,7 +186,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 )
         # explicit contributions
         for i in range(self.nstages):
-            if self._b_expl[i] != 0:
+            if (f_rhs != 0) and (self._b_expl[i] != 0):
                 r_form += (
                     Constant(self._dt * self._b_expl[i])
                     * inner(
