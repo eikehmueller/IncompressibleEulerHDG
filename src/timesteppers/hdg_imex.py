@@ -480,12 +480,15 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     )
                 self._shift_pressure(self._stage_state[i])
             its = self.pressure_solve(current_state, self._final_residual(w, f_rhs, tn))
+            self._shift_pressure(current_state)
             self.niter_final_pressure.update(its)
 
             # Add pressures from stages
             for idx in (1, 2):
                 current_state.subfunctions[idx].assign(
                     self._stage_state[self.nstages - 1].subfunctions[idx]
+                    + current_state.subfunctions[idx]
+                    / (self._dt * self._b_impl[self.nstages - 1])
                 )
 
         print(
