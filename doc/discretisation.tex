@@ -322,7 +322,7 @@ with $Q_0=Q^n$, $p_0=p^n$ subject to the constraint
 At each stage the residual $r_i$ is a one-form defined by
 \begin{equation}
     \begin{aligned}
-        r_i(w) & := (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{j=1}^{i-1} a_{i,j}^\impl \left(f^\impl(w,Q_j,\mathcal{P}(Q_{j-1}))+g(w,p_i,\lambda_i)\right) +\Delta t \sum_{j=0}^{i-1}a_{i,j}^\expl f^\expl(w;t^n+c_j \Delta t).
+        r_i(w) & := (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{j=1}^{i-1} a_{i,j}^\impl \left(f^\impl(w,Q_j,\mathcal{P}(Q_{j-1}))+g(w,p_j,\lambda_j)\right) +\Delta t \sum_{j=0}^{i-1}a_{i,j}^\expl f^\expl(w;t^n+c_j \Delta t).
     \end{aligned}
     \label{eqn:imex_residual_preliminary}
 \end{equation}
