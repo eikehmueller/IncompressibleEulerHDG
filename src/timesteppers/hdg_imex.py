@@ -40,7 +40,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.use_projection_method = use_projection_method
         assert self.flux in ["upwind", "centered"]
         # penalty parameter
-        self.alpha = 1
+        self.alpha_penalty = 1
         # stabilisation parameter
         self.tau = 1
         # number pf Richardson iterations
@@ -101,7 +101,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         a_form = (
             inner(Q_star("+"), n("+")) * inner(Q("+") - Q("-"), avg(w)) * dS
             - inner(outer(w, Q_star), grad(Q)) * dx
-            - self.alpha
+            - self.alpha_penalty
             * (
                 4 * avg(self._hF_inv) * avg(inner(Q, n)) * avg(inner(w, n)) * dS
                 + self._hF_inv * inner(Q, n) * inner(w, n) * ds
@@ -676,10 +676,10 @@ class IncompressibleEulerHDGIMEXSSP433(IncompressibleEulerHDGIMEX):
         super().__init__(
             mesh, degree, dt, flux, use_projection_method, label="HDG IMEX SSP3(4,3,3)"
         )
-        self.alpha = 0.2416942608
-        self.beta = 0.0604235652
-        self.eta = 0.1291528696
-        self.delta = 1 / 2 - self.alpha - self.beta - self.eta
+        self._alpha = 0.2416942608
+        self._beta = 0.0604235652
+        self._eta = 0.1291528696
+        self._delta = 1 / 2 - self._alpha - self._beta - self._eta
 
     @property
     def nstages(self):
@@ -702,10 +702,10 @@ class IncompressibleEulerHDGIMEXSSP433(IncompressibleEulerHDGIMEX):
         """4 x 4 matrix with implicit coefficients for intermediate stages"""
         return np.asarray(
             [
-                [self.alpha, 0, 0, 0],
-                [-self.alpha, self.alpha, 0, 0],
-                [0, 1 - self.alpha, self.alpha, 0],
-                [self.beta, self.eta, self.delta, self.alpha],
+                [self._alpha, 0, 0, 0],
+                [-self._alpha, self._alpha, 0, 0],
+                [0, 1 - self._alpha, self._alpha, 0],
+                [self._beta, self._eta, self._delta, self._alpha],
             ]
         )
 
