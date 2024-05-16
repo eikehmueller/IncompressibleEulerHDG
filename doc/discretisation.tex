@@ -300,14 +300,21 @@ Note that $g(w,p,\lambda)$ in Eqs. \eqref{eqn:time_evolution}, \eqref{eqn:imex_p
 Restricting ourselves to the special case $b_0^\impl=a_{i,0}^\impl=0$, an $s$-stage IMEX-RK scheme is given by: find $(Q^{n+1},p^{n+1},\lambda^{n+1})\in V_Q\times V_p\times V_{\text{trace}}$ such that
 \begin{equation}
     \begin{aligned}
-        (w\cdot Q^{n+1})_{\Omega_h} & = (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{i=1}^{s-1} b_i^\impl \left(f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))+g(w,p_i,\lambda_i)\right) \\&\qquad +\Delta t \sum_{i=0}^{s-1} b_i^\expl f^\expl(w;t^n+c_i \Delta t)+\Delta t\; g(w,p^{n+1},\lambda^{n+1})
+        (w\cdot Q^{n+1})_{\Omega_h} & = (w\cdot Q^n)_{\Omega_h} + \Delta t \sum_{i=1}^{s-1} b_i^\impl \left(f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))+g(w,p_i,\lambda_i)\right) \\&\qquad +\Delta t \sum_{i=0}^{s-1} b_i^\expl f^\expl(w;t^n+c_i \Delta t)+\Delta t\;b_{s-1}^\expl\; g(w,\delta p,\delta \lambda)
     \end{aligned}\label{eqn:Q_nplus1_equation}
 \end{equation}
 subject to the constraint
 \begin{equation}
-    \Gamma(\psi,\mu,Q^{n+1},p^{n+1},\lambda^{n+1}) = 0\label{eqn:Q_nplus1_equation_constraint}
+    \Gamma(\psi,\mu,Q^{n+1},\delta p,\delta \lambda) = 0\label{eqn:Q_nplus1_equation_constraint}
 \end{equation}
-for all test functions $(w,\psi,\mu)\in V_Q\times V_p\times V_{\text{trace}}$. Observe that the pressure at the next timestep appears on the right hand side of Eq. \eqref{eqn:Q_nplus1_equation}.
+for all test functions $(w,\psi,\mu)\in V_Q\times V_p\times V_{\text{trace}}$ and set
+\begin{xalignat}{2}
+    p^{n+1} & = p_{s-1}+\delta p, &
+    \lambda^{n+1} & = \lambda_{s-1}+\delta \lambda.
+\end{xalignat}
+Observe that the final pressure correction $\delta p$, $\delta \lambda$ appears on the right hand side of Eq. \eqref{eqn:Q_nplus1_equation}.
+
+
 The coefficients that define a particular IMEX method are usually written down in the form of Butcher Tableaus, see Section \ref{sec:butcher_tableaus} for details.
 
 The stage variables $Q_1,Q_2,\dots,Q_{s-1}\in V_Q$, $p_1,p_2,\dots,p_{s-1}\in V_p$ and $\lambda_1,\lambda_2,\dots,\lambda_{s-1}\in V_{\text{trace}}$ are obtained by: for $i=1,2,\dots,s-1$ find $(Q_i,p_i,\lambda_i)\in V_Q\times V_p\times V_{\text{trace}}$ such that
@@ -353,12 +360,12 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
         \State{Solve Eq. \eqref{eqn:imex_implicit_solve} subject to the constraint in Eq. \eqref{eqn:imex_implicit_solve_constraint} exactly in one step.}
         \EndIf
         \EndFor
-        \State{Compute $Q^{n+1}$, $p'$, $\lambda'$ by solving Eq. \eqref{eqn:Q_nplus1_equation} subject to the constraint in Eq. \eqref{eqn:Q_nplus1_equation_constraint}. For this, solve
+        \State{Compute $Q^{n+1}$, $\delta p$, $\delta \lambda$ by solving Eq. \eqref{eqn:Q_nplus1_equation} subject to the constraint in Eq. \eqref{eqn:Q_nplus1_equation_constraint}. For this, solve
             \begin{equation}
                 \begin{aligned}
                     (Q^{n+1}\cdot w)_{\Omega_h} -
-                    g(w,p',\lambda')                     & = r^{n+1}(w) \\
-                    \Gamma(\phi,\mu,Q^{n+1},p',\lambda') & = 0
+                    \Delta t\;b_{s-1}^\impl g(w,\delta p,\delta \lambda) & = r^{n+1}(w) \\
+                    \Gamma(\phi,\mu,Q^{n+1},\delta p,\delta \lambda)     & = 0
                 \end{aligned}\label{eqn:final_update}
             \end{equation}
         }
@@ -370,8 +377,8 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
         \end{equation}
         \State{Compute the (hybridised) pressure at the next timestep as
             \begin{xalignat}{2}
-                p^{n+1} &= p_{s-1}, &
-                \lambda^{n+1} &= \lambda_{s-1}
+                p^{n+1} &= p_{s-1}+\delta p, &
+                \lambda^{n+1} &= \lambda_{s-1}+\delta\lambda
             \end{xalignat}}
     \end{algorithmic}
 \end{algorithm}
