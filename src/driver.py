@@ -78,6 +78,18 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--forcing",
+        choices=[
+            "exponential",
+            "constant",
+        ],
+        type=str,
+        action="store",
+        default="constant",
+        help="forcing",
+    )
+
+    parser.add_argument(
         "--test_pressure_solver",
         action="store_true",
         default=False,
@@ -93,7 +105,7 @@ if __name__ == "__main__":
     # resulting timestep size
     dt = t_final / nt
     # decay constant, kappa=0 corresponds to stationary vortex
-    kappa = 1
+    kappa = 0.5
 
     mesh = UnitSquareMesh(args.nx, args.nx, quadrilateral=False)
 
@@ -173,6 +185,7 @@ if __name__ == "__main__":
     print(f"timestep size = {dt}")
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
+    print(f"forcing = {args.forcing}")
     print(f"use projection method = {args.use_projection_method}")
     print(f"timestepping method = {timestepper.label}")
     print()
@@ -189,7 +202,12 @@ if __name__ == "__main__":
     if kappa == 0:
         f_rhs = 0
     else:
-        f_rhs = lambda t: -kappa * exp(-kappa * t) * Q_stationary
+        if args.forcing == "exponential":
+            f_rhs = lambda t: -kappa * exp(-kappa * t) * Q_stationary
+        elif args.forcing == "constant":
+            f_rhs = lambda t: -kappa * Q_stationary
+        else:
+            raise NotImplementedError(f"Unknown forcing function: {args.forcing}")
 
     if args.test_pressure_solver:
         pcg = PCG64(seed=123456789)
@@ -217,12 +235,22 @@ if __name__ == "__main__":
     Q.rename("velocity")
     p.rename("pressure")
 
-    Q_exact = assemble(exp(-kappa * t_final) * Function(V_Q).interpolate(Q_stationary))
-    Q_exact.rename("velocity_exact")
-    p_exact = assemble(
-        exp(-2 * kappa * t_final) * Function(V_p).interpolate(p_stationary)
-    )
+    if args.forcing == "exponential":
+        Q_exact = assemble(
+            exp(-kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
+        )
+        p_exact = assemble(
+            exp(-2 * kappa * t_final) * Function(V_p).interpolate(p_stationary)
+        )
+    elif args.forcing == "constant":
+        Q_exact = assemble(
+            (1.0 - kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
+        )
+        p_exact = assemble(
+            (1 - kappa * t_final) ** 2 * Function(V_p).interpolate(p_stationary)
+        )
     p_exact -= assemble(p_exact * dx)
+    Q_exact.rename("velocity_exact")
     p_exact.rename("pressure_exact")
 
     Q_error = assemble(Q - Q_exact)
