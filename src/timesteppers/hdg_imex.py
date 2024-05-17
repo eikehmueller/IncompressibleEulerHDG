@@ -64,6 +64,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.niter_tentative = Averager()
         self.niter_pressure = Averager()
         self.niter_final_pressure = Averager()
+        self.niter_pressure_reconstruction = Averager()
 
     @property
     @abstractmethod
@@ -383,6 +384,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.niter_tentative.reset()
         self.niter_pressure.reset()
         self.niter_final_pressure.reset()
+        self.niter_pressure_reconstruction.reset()
+        n_ = FacetNormal(self._mesh)
         # loop over all timesteps
         for n in tqdm.tqdm(range(nt)):
             self._stage_state[0].assign(current_state)
@@ -431,7 +434,6 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             solver_tentative.snes.getKSP().getIterationNumber()
                         )
                         # step 2: compute (hybridised) pressure and velocity increment
-                        n_ = FacetNormal(self._mesh)
                         b_rhs_mixed_poisson = Constant(
                             -1 / (self._a_impl[i, i] * self._dt)
                         ) * (
@@ -480,29 +482,41 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     )
                 self._shift_pressure(self._stage_state[i])
             its = self.pressure_solve(current_state, self._final_residual(w, f_rhs, tn))
-            self._shift_pressure(current_state)
             self.niter_final_pressure.update(its)
 
-            # Add pressures from stages
+            # Reconstruct pressure from velocity
+            Q_new = current_state.subfunctions[0]
+            f_new = Function(self._V_Q).interpolate(f_rhs(Constant(tn + self._dt)))
+            f_reconstruction = -f_new + dot(grad(Q_new), Q_new)
+            b_rhs_pressure_reconstruction = (
+                psi * div(f_reconstruction) * dx + mu * inner(n_, f_reconstruction) * ds
+            )
+            pressure_reconstruction = Function(self._V)
+            its = self.pressure_solve(
+                pressure_reconstruction, b_rhs_pressure_reconstruction
+            )
+            self.niter_pressure_reconstruction.update(its)
             for idx in (1, 2):
                 current_state.subfunctions[idx].assign(
-                    self._stage_state[self.nstages - 1].subfunctions[idx]
-                    + current_state.subfunctions[idx]
-                    / (self._dt * self._b_impl[self.nstages - 1])
+                    pressure_reconstruction.subfunctions[idx]
                 )
+            self._shift_pressure(current_state)
 
         print(
-            f"average number of tentative velocity solver iterations : {self.niter_tentative.value:8.2f}"
+            f"average number of tentative velocity solver iterations      : {self.niter_tentative.value:8.2f}"
         )
         if self.use_projection_method:
             print()
             print(
-                f"average number of pressure solver iterations           : {self.niter_pressure.value:8.2f}"
+                f"average number of pressure solver iterations                : {self.niter_pressure.value:8.2f}"
             )
             print(
-                f"average number of final pressure solver iterations     : {self.niter_final_pressure.value:8.2f}"
+                f"average number of final pressure solver iterations          : {self.niter_final_pressure.value:8.2f}"
             )
-        return current_state.subfunctions[0], current_state.subfunctions[1]
+        print(
+            f"average number of pressure reconstruction solver iterations : {self.niter_pressure_reconstruction.value:8.2f}"
+        )
+        return current_state.subfunctions[0], current_state.subfunctions[1], p_centre
 
 
 class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
