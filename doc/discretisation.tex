@@ -64,7 +64,7 @@ We consider the incompressible Euler equations for velocity $Q(x,t)$ and pressur
         \nabla\cdot Q                               & = 0
     \end{aligned}\label{eqn:incompressible_euler}
 \end{equation}
-in the domain $\Omega=[0,1]^d$ with the initial condition $Q(x,0) = Q_0(x)$ and the boundary condition \mbox{$(n\cdot Q)_{\partial \Omega}=0$} on $\partial\Omega$. $f$ is a time dependent forcing function.
+in the domain $\Omega=[0,1]^d$ with the initial condition $Q(x,0) = Q_0(x)$ and the boundary condition \mbox{$n\cdot Q\vert_{\partial \Omega}=0$} on $\partial\Omega$. $f$ is a time dependent forcing function.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Notation}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -219,7 +219,7 @@ To obtain $\overline{Q}$, replace $Q^{n+1} \mapsto \overline{Q}$ in Eq. \eqref{e
 In the continuum, the mixed Poisson equation that we need to solve can be written as
 \begin{xalignat}{2}
     \delta Q + \nabla p^{n+1} &= 0, &
-    \nabla \cdot \delta Q &= -\frac{1}{\Delta t} \nabla\cdot \overline{Q}.
+    \nabla \cdot \delta Q &= -\frac{1}{\Delta t} \nabla\cdot \overline{Q}.\label{eqn:mixed_poisson_continuum}
 \end{xalignat}
 In a single cell $K$ the weak form is
 \begin{equation}
@@ -490,6 +490,37 @@ The coefficients $a_{i,j}^\impl$, $a_{i,j}^\expl$, $b_{i}^\impl$, $b_{i}^\expl$ 
     \caption{Butcher Tableaus for the ARS(2,3,2) method, see \cite[Fig. 2]{Weller2013}}
     \label{tab:butcher_tableau_ars232}
 \end{table}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Pressure reconstruction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The pressure $p$ can be reconstructed from the velocity $Q$ at a given time by solving an elliptic problem. To see this, take the divergence of the first line of Eq. \eqref{eqn:incompressible_euler} in the domain $\Omega$ and mutiply it by the outward normal $n$ on the boundary $\partial_\Omega$. Since $\nabla\cdot \partial_t Q = 0$ in $\Omega$ and $n\cdot \partial_t Q=0$ on $\partial \Omega$, this results in the following boundary value problem
+\begin{equation}
+    \begin{aligned}
+        -\Delta p        & = f_p\qquad\text{in $\Omega$}         \\
+        -n\cdot \nabla p & = g_p\qquad\text{on $\partial\Omega$}
+    \end{aligned}\label{eqn:pressure_reconstruction_primal}
+\end{equation}
+with the functions
+\begin{xalignat}{2}
+    f_p(Q,f) &:= -\nabla \cdot f + \nabla\cdot \left((Q\cdot\nabla) Q\right),&
+    g_p(Q,f) &:= -n\cdot f + n\cdot \left((Q\cdot\nabla) Q\right).
+\end{xalignat}
+To make the solution unique, for also require that $\int_\Omega p\;dx=0$.
+By introducing the new variable $U$, the second order problem in Eq. \eqref{eqn:pressure_reconstruction_primal} can be written in mixed form as
+\begin{xalignat}{2}
+    U + \nabla p &= 0,& \nabla \cdot U &= f_p\label{eqn:mixed_poisson_reconstruction}
+\end{xalignat}
+subject to the boundary condition $n\cdot U\vert_{\partial \Omega} = g_p$. Eq. \eqref{eqn:mixed_poisson_reconstruction} can be solved through hybridisation in the same way as the corresponding problem in Eq. \eqref{eqn:mixed_poisson_continuum}. For this, we solve the following weak problem (c.f. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness}):
+find $(U,p,\lambda) \in V_Q\times V_p\times V_{\text{trace}}$ such that
+\begin{subequations}
+    \begin{align}
+        (U\cdot w)_{\Omega_h} - (p \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda\rangle_{F} & = 0\label{eqn:mixed_poisson_reconstruction_velocity}                     \\
+        (\psi \nabla\cdot U)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p-\lambda)\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p - \lambda)\psi\rangle_{F}   & = (\psi f_p)_{\Omega_h}\label{eqn:mixed_poisson_reconstruction_pressure} \\
+        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{U\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(U\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}  & = \sum_{F\in\mathcal{E}_h^\partial}\langle \mu g_p\rangle_F
+        \label{eqn:mixed_poisson_reconstruction_uniqueness}
+    \end{align}
+\end{subequations}
+for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \appendix
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
