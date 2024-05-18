@@ -85,7 +85,7 @@ if __name__ == "__main__":
         ],
         type=str,
         action="store",
-        default="constant",
+        default="exponential",
         help="forcing",
     )
 
