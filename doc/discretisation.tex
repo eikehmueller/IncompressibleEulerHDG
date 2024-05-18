@@ -262,7 +262,7 @@ Putting everything together we need to solve the following weak problem: find $(
 \end{subequations}
 for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$ where the weak divergence is given by
 \begin{equation}
-    \text{Div}(\psi,Q) := (\psi \nabla \cdot Q)_{\Omega_h}-\sum_{F\in\mathcal{E}_h^i}\langle\psi(Q-\avg{Q})\cdot n\rangle_F-\sum_{F\in\mathcal{E}_h^\partial}\langle\psi (Q\cdot n)\rangle_F
+    \text{Div}(\psi,Q) := (\psi \nabla \cdot Q)_{\Omega_h}-\sum_{F\in\mathcal{E}_h^i}\langle\psi(Q-\avg{Q})\cdot n\rangle_F-\sum_{F\in\mathcal{E}_h^\partial}\langle\psi (Q\cdot n)\rangle_F.\label{eqn:weak_divergence}
 \end{equation}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \paragraph{Final update.}
@@ -493,34 +493,33 @@ The coefficients $a_{i,j}^\impl$, $a_{i,j}^\expl$, $b_{i}^\impl$, $b_{i}^\expl$ 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Pressure reconstruction}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-The pressure $p$ can be reconstructed from the velocity $Q$ at a given time by solving an elliptic problem. To see this, take the divergence of the first line of Eq. \eqref{eqn:incompressible_euler} in the domain $\Omega$ and mutiply it by the outward normal $n$ on the boundary $\partial_\Omega$. Since $\nabla\cdot \partial_t Q = 0$ in $\Omega$ and $n\cdot \partial_t Q=0$ on $\partial \Omega$, this results in the following boundary value problem
+The pressure $p$ can be reconstructed from the velocity $Q$ at a given time by solving an elliptic problem. To see this, take the divergence of the first line of Eq. \eqref{eqn:incompressible_euler} in the domain $\Omega$ and mutiply it by the outward normal $n$ on the boundary $\partial \Omega$. Since $\nabla\cdot \partial_t Q = 0$ in $\Omega$ and $n\cdot \partial_t Q=0$ on $\partial \Omega$, this results in the following boundary value problem
 \begin{equation}
     \begin{aligned}
-        -\Delta p        & = f_p\qquad\text{in $\Omega$}         \\
-        -n\cdot \nabla p & = g_p\qquad\text{on $\partial\Omega$}
+        -\Delta p        & = \nabla \cdot f_p\qquad\text{in $\Omega$}    \\
+        -n\cdot \nabla p & = n\cdot f_p \qquad\text{on $\partial\Omega$}
     \end{aligned}\label{eqn:pressure_reconstruction_primal}
 \end{equation}
-with the functions
-\begin{xalignat}{2}
-    f_p(Q,f) &:= -\nabla \cdot f + \nabla\cdot \left((Q\cdot\nabla) Q\right),&
-    g_p(Q,f) &:= -n\cdot f + n\cdot \left((Q\cdot\nabla) Q\right).
-\end{xalignat}
-To make the solution unique, for also require that $\int_\Omega p\;dx=0$.
+with the function
+\begin{equation}
+    f_p := -f + (Q\cdot \nabla) Q.
+\end{equation}
+To make the solution $p$ of Eq. \eqref{eqn:pressure_reconstruction_primal} unique, we require that $\int_\Omega p\;dx=0$.
 By introducing the new variable $U$, the second order problem in Eq. \eqref{eqn:pressure_reconstruction_primal} can be written in mixed form as
 \begin{xalignat}{2}
-    U + \nabla p &= 0,& \nabla \cdot U &= f_p\label{eqn:mixed_poisson_reconstruction}
+    U + \nabla p &= 0,& \nabla \cdot U &= \nabla \cdot f_p\label{eqn:mixed_poisson_reconstruction}
 \end{xalignat}
-subject to the boundary condition $n\cdot U\vert_{\partial \Omega} = g_p$. Eq. \eqref{eqn:mixed_poisson_reconstruction} can be solved through hybridisation in the same way as the corresponding problem in Eq. \eqref{eqn:mixed_poisson_continuum}. For this, we solve the following weak problem (c.f. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness}):
+subject to the boundary condition $n\cdot U\vert_{\partial \Omega} = n\cdot f_p$. Eq. \eqref{eqn:mixed_poisson_reconstruction} can be solved through hybridisation in exactly the same way as the corresponding problem in Eq. \eqref{eqn:mixed_poisson_continuum}. For this, we solve the following weak problem (c.f. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness}):
 find $(U,p,\lambda) \in V_Q\times V_p\times V_{\text{trace}}$ such that
 \begin{subequations}
     \begin{align}
-        (U\cdot w)_{\Omega_h} - (p \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda\rangle_{F} & = 0\label{eqn:mixed_poisson_reconstruction_velocity}                     \\
-        (\psi \nabla\cdot U)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p-\lambda)\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p - \lambda)\psi\rangle_{F}   & = (\psi f_p)_{\Omega_h}\label{eqn:mixed_poisson_reconstruction_pressure} \\
-        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{U\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(U\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}  & = \sum_{F\in\mathcal{E}_h^\partial}\langle \mu g_p\rangle_F
+        (U\cdot w)_{\Omega_h} - (p \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda\rangle_{F} & = 0\label{eqn:mixed_poisson_reconstruction_velocity}                    \\
+        (\psi \nabla\cdot U)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p-\lambda)\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p - \lambda)\psi\rangle_{F}   & = \text{Div}(\psi,f_p)\label{eqn:mixed_poisson_reconstruction_pressure} \\
+        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{U\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(U\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}  & = \sum_{F\in\mathcal{E}_h^\partial}\langle \mu n\cdot f_p\rangle_F
         \label{eqn:mixed_poisson_reconstruction_uniqueness}
     \end{align}
 \end{subequations}
-for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$.
+for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$. The weak divergence operator $\text{Div}(\psi,\cdot)$ that appears on the right hand side of Eq. \eqref{eqn:mixed_poisson_reconstruction_pressure} is defined in Eq. \eqref{eqn:weak_divergence}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \appendix
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

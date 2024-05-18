@@ -136,6 +136,20 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             + (inner(Q, n) + self.tau * (p - lmbda)) * mu * ds
         )
 
+    def _weak_divergence(self, psi, Q):
+        """Compute weak divergence
+
+        :arg psi: test function in pressure space
+        :arg Q: velocity function to take the weak divergence of
+        """
+        n = FacetNormal(self._mesh)
+        return (
+            psi * div(Q) * dx
+            - 2 * avg(psi * inner(n, Q)) * dS
+            + inner(2 * avg(psi * n), avg(Q)) * dS
+            - psi * inner(n, Q) * ds
+        )
+
     def _residual(self, w, f_rhs, i, tn):
         """Compute residual r_i(w) at stage i
 
@@ -436,12 +450,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         # step 2: compute (hybridised) pressure and velocity increment
                         b_rhs_mixed_poisson = Constant(
                             -1 / (self._a_impl[i, i] * self._dt)
-                        ) * (
-                            psi * div(Q_tentative) * dx
-                            - 2 * avg(psi * inner(n_, Q_tentative)) * dS
-                            + inner(2 * avg(psi * n_), avg(Q_tentative)) * dS
-                            - psi * inner(n_, Q_tentative) * ds
-                        )
+                        ) * self._weak_divergence(psi, Q_tentative)
                         update = Function(self._V)
                         its = self.pressure_solve(update, b_rhs_mixed_poisson)
                         self.niter_pressure.update(its)
@@ -487,9 +496,9 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             # Reconstruct pressure from velocity
             Q_new = current_state.subfunctions[0]
             f_new = Function(self._V_Q).interpolate(f_rhs(Constant(tn + self._dt)))
-            f_reconstruction = -f_new + dot(grad(Q_new), Q_new)
             b_rhs_pressure_reconstruction = (
-                psi * div(f_reconstruction) * dx + mu * inner(n_, f_reconstruction) * ds
+                self._weak_divergence(psi, -f_new + dot(grad(Q_new), Q_new))
+                + mu * (inner(outer(n_, Q_new), grad(Q_new)) - inner(n_, f_new)) * ds
             )
             pressure_reconstruction = Function(self._V)
             its = self.pressure_solve(
