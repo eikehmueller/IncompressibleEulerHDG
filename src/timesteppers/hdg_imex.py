@@ -525,7 +525,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         print(
             f"average number of pressure reconstruction solver iterations : {self.niter_pressure_reconstruction.value:8.2f}"
         )
-        return current_state.subfunctions[0], current_state.subfunctions[1], p_centre
+        return current_state.subfunctions[0], current_state.subfunctions[1]
 
 
 class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
