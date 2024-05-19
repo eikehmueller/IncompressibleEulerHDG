@@ -504,18 +504,27 @@ with the function
 \begin{equation}
     f_p := -f + (Q\cdot \nabla) Q.
 \end{equation}
-To make the solution $p$ of Eq. \eqref{eqn:pressure_reconstruction_primal} unique, we require that $\int_\Omega p\;dx=0$.
+To make the solution $p$ of Eq. \eqref{eqn:pressure_reconstruction_primal} unique, we require that $\int_\Omega p\;dx=0$. The expression $n\cdot f_p\vert_{\partial \Omega}$ can be simplified as follows: Since $n\cdot Q\vert_{\partial \Omega}=0$, we can write on the boundary
+\begin{equation}
+    \begin{aligned}
+    n\cdot f_p &= -n\cdot f + (Q\cdot \nabla) (n\cdot Q) \\
+    &= -n\cdot f+(Q^\parallel \cdot \nabla^\parallel)(n\cdot Q)\\
+    &= -n\cdot f
+    \end{aligned}\label{eqn:n_dot_fp}
+\end{equation}
+where $Q^\parallel$ is the part of $Q$ that is tangential to the boundary and similarly $\nabla^\parallel$ is the derivative in the tangential direction. The final line in Eq. \eqref{eqn:n_dot_fp} follows since on the boundary $n\cdot Q=0$ obviously does not change in the tangential direction.
+
 By introducing the new variable $U$, the second order problem in Eq. \eqref{eqn:pressure_reconstruction_primal} can be written in mixed form as
 \begin{xalignat}{2}
     U + \nabla p &= 0,& \nabla \cdot U &= \nabla \cdot f_p\label{eqn:mixed_poisson_reconstruction}
 \end{xalignat}
-subject to the boundary condition $n\cdot U\vert_{\partial \Omega} = n\cdot f_p$. Eq. \eqref{eqn:mixed_poisson_reconstruction} can be solved through hybridisation in exactly the same way as the corresponding problem in Eq. \eqref{eqn:mixed_poisson_continuum}. For this, we solve the following weak problem (c.f. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness}):
+subject to the boundary condition $n\cdot U\vert_{\partial \Omega} = -n\cdot f$. Eq. \eqref{eqn:mixed_poisson_reconstruction} can be solved through hybridisation in exactly the same way as the corresponding problem in Eq. \eqref{eqn:mixed_poisson_continuum}. For this, we solve the following weak problem (c.f. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness}):
 find $(U,p,\lambda) \in V_Q\times V_p\times V_{\text{trace}}$ such that
 \begin{subequations}
     \begin{align}
         (U\cdot w)_{\Omega_h} - (p \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda\rangle_{F} & = 0\label{eqn:mixed_poisson_reconstruction_velocity}                    \\
         (\psi \nabla\cdot U)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p-\lambda)\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p - \lambda)\psi\rangle_{F}   & = \text{Div}(\psi,f_p)\label{eqn:mixed_poisson_reconstruction_pressure} \\
-        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{U\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(U\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}  & = \sum_{F\in\mathcal{E}_h^\partial}\langle \mu n\cdot f_p\rangle_F
+        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{U\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(U\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}  & = -\sum_{F\in\mathcal{E}_h^\partial}\langle \mu n\cdot f\rangle_F
         \label{eqn:mixed_poisson_reconstruction_uniqueness}
     \end{align}
 \end{subequations}

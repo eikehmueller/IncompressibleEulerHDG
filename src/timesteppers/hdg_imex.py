@@ -498,7 +498,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             f_new = Function(self._V_Q).interpolate(f_rhs(Constant(tn + self._dt)))
             b_rhs_pressure_reconstruction = (
                 self._weak_divergence(psi, -f_new + dot(grad(Q_new), Q_new))
-                + mu * (inner(outer(n_, Q_new), grad(Q_new)) - inner(n_, f_new)) * ds
+                - mu * inner(n_, f_new) * ds
             )
             pressure_reconstruction = Function(self._V)
             its = self.pressure_solve(
