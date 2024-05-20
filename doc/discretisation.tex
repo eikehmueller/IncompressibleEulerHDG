@@ -262,7 +262,7 @@ Putting everything together we need to solve the following weak problem: find $(
 \end{subequations}
 for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$ where the weak divergence is given by
 \begin{equation}
-    \text{Div}(\psi,Q) := (\psi \nabla \cdot Q)_{\Omega_h}-\sum_{F\in\mathcal{E}_h^i}\langle\psi(Q-\avg{Q})\cdot n\rangle_F-\sum_{F\in\mathcal{E}_h^\partial}\langle\psi (Q\cdot n)\rangle_F.\label{eqn:weak_divergence}
+    \text{Div}(\psi,Q) := (\psi \nabla \cdot Q)_{\Omega_h}-2\sum_{F\in\mathcal{E}_h^i}\langle(\avg{\psi Q}-\avg{\psi}\avg{Q})\cdot n\rangle_F-\sum_{F\in\mathcal{E}_h^\partial}\langle\psi (Q\cdot n)\rangle_F.\label{eqn:weak_divergence}
 \end{equation}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \paragraph{Final update.}
