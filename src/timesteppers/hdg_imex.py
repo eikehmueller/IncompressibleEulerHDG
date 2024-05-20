@@ -12,6 +12,7 @@ __all__ = [
     "IncompressibleEulerHDGIMEXImplicit",
     "IncompressibleEulerHDGIMEXARS232",
     "IncompressibleEulerHDGIMEXARS443",
+    "IncompressibleEulerHDGIMEXSSP332",
     "IncompressibleEulerHDGIMEXSSP433",
 ]
 
@@ -686,6 +687,63 @@ class IncompressibleEulerHDGIMEXARS443(IncompressibleEulerHDGIMEX):
     def _c_expl(self):
         """vector of length 5 with fractional times at which explicit term is evaluated"""
         return np.asarray([0, 1 / 2, 2 / 3, 1 / 2, 1])
+
+
+class IncompressibleEulerHDGIMEXSSP332(IncompressibleEulerHDGIMEX):
+    """IMEX SSP2(3,3,2) timestepper for the incompressible Euler equations"""
+
+    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+        """Initialise new instance
+
+        :arg mesh: underlying mesh
+        :arg degree: polynomial degree of pressure space
+        :arg dt: timestep size
+        :arg flux: numerical flux to use, either "upwind" or "centered"
+        :arg use_projection_method: use projection method instead of monolithic solve
+        """
+        super().__init__(
+            mesh,
+            degree,
+            dt,
+            flux,
+            use_projection_method,
+            label="HDG IMEX SSP2(3,3,2)",
+        )
+
+    @property
+    def nstages(self):
+        return 3
+
+    @property
+    def _a_expl(self):
+        """3 x 3 matrix with explicit coefficients for intermediate stages"""
+        return np.asarray([[0, 0, 0], [1 / 2, 0, 0], [1 / 2, 1 / 2, 0]])
+
+    @property
+    def _a_impl(self):
+        """3 x 3 matrix with implicit coefficients for intermediate stages"""
+        return np.asarray(
+            [
+                [1 / 4, 0, 0],
+                [0, 1 / 4, 0],
+                [1 / 3, 1 / 3, 1 / 3],
+            ]
+        )
+
+    @property
+    def _b_expl(self):
+        """vector of length 3 with explicit coefficients for final stage"""
+        return np.asarray([1 / 3, 1 / 3, 1 / 3])
+
+    @property
+    def _b_impl(self):
+        """vector of length 3 with implicit coefficients for final stage"""
+        return np.asarray([1 / 3, 1 / 3, 1 / 3])
+
+    @property
+    def _c_expl(self):
+        """vector of length 3 with fractional times at which explicit term is evaluated"""
+        return np.asarray([0, 1, 1 / 2])
 
 
 class IncompressibleEulerHDGIMEXSSP433(IncompressibleEulerHDGIMEX):

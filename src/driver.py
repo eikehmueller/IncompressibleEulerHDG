@@ -70,6 +70,7 @@ if __name__ == "__main__":
             "imex_ars232",
             "imex_ars443",
             "imex_ssp433",
+            "imex_ssp332",
         ],
         type=str,
         action="store",
@@ -155,6 +156,14 @@ if __name__ == "__main__":
             )
         elif args.timestepper == "imex_ssp433":
             timestepper = IncompressibleEulerHDGIMEXSSP433(
+                mesh,
+                args.degree,
+                dt,
+                flux=args.flux,
+                use_projection_method=args.use_projection_method,
+            )
+        elif args.timestepper == "imex_ssp332":
+            timestepper = IncompressibleEulerHDGIMEXSSP332(
                 mesh,
                 args.degree,
                 dt,
