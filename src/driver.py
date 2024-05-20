@@ -74,7 +74,7 @@ if __name__ == "__main__":
         ],
         type=str,
         action="store",
-        default="imex_SSP2_332",
+        default="imex_ssp2_332",
         help="timestepper",
     )
 
