@@ -261,8 +261,8 @@ if __name__ == "__main__":
     Q_error_nrm = np.sqrt(assemble(inner(Q_error, Q_error) * dx))
     p_error_nrm = np.sqrt(assemble((p_error) ** 2 * dx))
     print()
-    print(f"Velocity error = {Q_error_nrm}")
-    print(f"Pressure error = {p_error_nrm}")
+    print(f"velocity error = {Q_error_nrm}")
+    print(f"pressure error = {p_error_nrm}")
     print()
 
     divQ = Function(V_p, name="divergence")

@@ -3,6 +3,7 @@
 from abc import abstractmethod
 from functools import cached_property
 import tqdm
+import time
 
 from firedrake import *
 from timesteppers.common import *
@@ -400,6 +401,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.niter_final_pressure.reset()
         self.niter_pressure_reconstruction.reset()
         n_ = FacetNormal(self._mesh)
+        t_start = time.clock_gettime_ns(time.CLOCK_REALTIME)
         # loop over all timesteps
         for n in tqdm.tqdm(range(nt)):
             self._stage_state[0].assign(current_state)
@@ -510,7 +512,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     pressure_reconstruction.subfunctions[idx]
                 )
             self._shift_pressure(current_state)
-
+        t_finish = time.clock_gettime_ns(time.CLOCK_REALTIME)
         print(
             f"average number of tentative velocity solver iterations      : {self.niter_tentative.value:8.2f}"
         )
@@ -525,6 +527,10 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         print(
             f"average number of pressure reconstruction solver iterations : {self.niter_pressure_reconstruction.value:8.2f}"
         )
+        t_elapsed = 1.0e-9 * (t_finish - t_start)
+        print()
+        print(f"elapsed time       = {t_elapsed:10.4f} s")
+        print(f"time per iteration = {(t_elapsed/nt):10.4f} s")
         return current_state.subfunctions[0], current_state.subfunctions[1]
 
 
