@@ -67,14 +67,14 @@ if __name__ == "__main__":
         choices=[
             "implicit",
             "imex_implicit",
-            "imex_ars232",
-            "imex_ars443",
-            "imex_ssp433",
-            "imex_ssp332",
+            "imex_ars2_232",
+            "imex_ars3_443",
+            "imex_ssp2_332",
+            "imex_ssp3_433",
         ],
         type=str,
         action="store",
-        default="imex_ars232",
+        default="imex_SSP2_332",
         help="timestepper",
     )
 
@@ -138,32 +138,32 @@ if __name__ == "__main__":
             timestepper = IncompressibleEulerHDGImplicit(
                 mesh, args.degree, dt, args.flux, args.use_projection_method
             )
-        elif args.timestepper == "imex_ars232":
-            timestepper = IncompressibleEulerHDGIMEXARS232(
+        elif args.timestepper == "imex_ars2_232":
+            timestepper = IncompressibleEulerHDGIMEXARS2_232(
                 mesh,
                 args.degree,
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
             )
-        elif args.timestepper == "imex_ars443":
-            timestepper = IncompressibleEulerHDGIMEXARS443(
+        elif args.timestepper == "imex_ars3_443":
+            timestepper = IncompressibleEulerHDGIMEXARS3_443(
                 mesh,
                 args.degree,
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
             )
-        elif args.timestepper == "imex_ssp433":
-            timestepper = IncompressibleEulerHDGIMEXSSP433(
+        elif args.timestepper == "imex_ssp2_332":
+            timestepper = IncompressibleEulerHDGIMEXSSP2_332(
                 mesh,
                 args.degree,
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
             )
-        elif args.timestepper == "imex_ssp332":
-            timestepper = IncompressibleEulerHDGIMEXSSP332(
+        elif args.timestepper == "imex_ssp3_433":
+            timestepper = IncompressibleEulerHDGIMEXSSP3_433(
                 mesh,
                 args.degree,
                 dt,

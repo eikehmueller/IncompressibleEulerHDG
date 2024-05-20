@@ -10,10 +10,10 @@ from timesteppers.common import *
 __all__ = [
     "IncompressibleEulerHDGIMEX",
     "IncompressibleEulerHDGIMEXImplicit",
-    "IncompressibleEulerHDGIMEXARS232",
-    "IncompressibleEulerHDGIMEXARS443",
-    "IncompressibleEulerHDGIMEXSSP332",
-    "IncompressibleEulerHDGIMEXSSP433",
+    "IncompressibleEulerHDGIMEXARS2_232",
+    "IncompressibleEulerHDGIMEXARS3_443",
+    "IncompressibleEulerHDGIMEXSSP2_332",
+    "IncompressibleEulerHDGIMEXSSP3_433",
 ]
 
 
@@ -529,6 +529,11 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         return current_state.subfunctions[0], current_state.subfunctions[1]
 
 
+#######################################################################################
+#       S P E C I F I C     I M E X     T I M E S T E P P E R S                       #
+#######################################################################################
+
+
 class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
     """IMEX implementation of the first order implicit method"""
 
@@ -575,7 +580,7 @@ class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
         return np.asarray([0, 1])
 
 
-class IncompressibleEulerHDGIMEXARS232(IncompressibleEulerHDGIMEX):
+class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
     """IMEX ARS2(2,3,2) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
@@ -627,7 +632,7 @@ class IncompressibleEulerHDGIMEXARS232(IncompressibleEulerHDGIMEX):
         return np.asarray([0, self.gamma, 1])
 
 
-class IncompressibleEulerHDGIMEXARS443(IncompressibleEulerHDGIMEX):
+class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
     """IMEX ARS3(4,4,3) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
@@ -689,7 +694,7 @@ class IncompressibleEulerHDGIMEXARS443(IncompressibleEulerHDGIMEX):
         return np.asarray([0, 1 / 2, 2 / 3, 1 / 2, 1])
 
 
-class IncompressibleEulerHDGIMEXSSP332(IncompressibleEulerHDGIMEX):
+class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
     """IMEX SSP2(3,3,2) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
@@ -746,7 +751,7 @@ class IncompressibleEulerHDGIMEXSSP332(IncompressibleEulerHDGIMEX):
         return np.asarray([0, 1, 1 / 2])
 
 
-class IncompressibleEulerHDGIMEXSSP433(IncompressibleEulerHDGIMEX):
+class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
     """IMEX SSP3(4,3,3) timestepper for the incompressible Euler equations"""
 
     def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
