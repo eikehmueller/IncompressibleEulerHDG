@@ -135,7 +135,7 @@ if __name__ == "__main__":
     elif args.discretisation == "hdg":
         # HDG discretisation
         if args.timestepper == "implicit":
-            timestepper = IncompressibleEulerHDGImplicit(
+            timestepper = IncompressibleEulerHDGIMEXImplicit(
                 mesh, args.degree, dt, args.flux, args.use_projection_method
             )
         elif args.timestepper == "imex_ars2_232":
