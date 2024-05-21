@@ -3,10 +3,10 @@
 from abc import abstractmethod
 from functools import cached_property
 import tqdm
-import time
 
 from firedrake import *
 from timesteppers.common import *
+from auxilliary.logging import PerformanceLog
 
 __all__ = [
     "IncompressibleEulerHDGIMEX",
@@ -271,6 +271,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         a_mass_inv_mat = a_mass_inv.M.handle
         return a_mass_inv_mat.matMult(a_proj_mat)
 
+    @PerformanceLog("pressure_solve")
     def pressure_solve(self, state, b_rhs):
         """Solve the hybridised mixed system for the pressure
 
@@ -361,6 +362,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             nullspace=self.nullspace,
             appctx=appctx,
         )
+
         solver_mixed_poisson.solve()
         its = (
             solver_mixed_poisson.snes.getKSP()
@@ -402,123 +404,128 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.niter_final_pressure.reset()
         self.niter_pressure_reconstruction.reset()
         n_ = FacetNormal(self._mesh)
-        t_start = time.clock_gettime_ns(time.CLOCK_REALTIME)
         # loop over all timesteps
         for n in tqdm.tqdm(range(nt)):
-            self._stage_state[0].assign(current_state)
-            tn = n * self._dt  # current time
-            # loop over stages 1,2,...,s-1
-            for i in range(1, self.nstages):
-                # compute Q*_{i-1}
-                self._Qstar[i - 1].assign(
-                    self.project_bdm(self._stage_state[i - 1].subfunctions[0])
-                )
-                if self.use_projection_method:
-                    rhs_i = self._residual(w_Q, f_rhs, i, tn)
-                    Q_i.assign(self._stage_state[i].subfunctions[0])
-                    p_i.assign(self._stage_state[i].subfunctions[1])
-                    lambda_i.assign(self._stage_state[i].subfunctions[2])
-                    # Richardson iteration
-                    for _ in range(self._n_richardson):
-                        # Compute residual
-                        b_rhs_tentative = (
-                            rhs_i
-                            - inner(w_Q, Q_i) * dx
-                            + Constant(self._a_impl[i, i] * self._dt)
-                            * (
-                                self._f_impl(w_Q, Q_i, self._Qstar[i - 1])
-                                + self._pressure_gradient(w_Q, p_i, lambda_i)
-                            )
+            with PerformanceLog("timestep"):
+                self._stage_state[0].assign(current_state)
+                tn = n * self._dt  # current time
+                # loop over stages 1,2,...,s-1
+                for i in range(1, self.nstages):
+                    # compute Q*_{i-1}
+                    with PerformanceLog("bdm_projection"):
+                        self._Qstar[i - 1].assign(
+                            self.project_bdm(self._stage_state[i - 1].subfunctions[0])
                         )
-                        # step 1: compute tentative velocity
-                        a_tentative = inner(u_Q, w_Q) * dx - Constant(
-                            self._a_impl[i, i] * self._dt
-                        ) * self._f_impl(w_Q, u_Q, self._Qstar[i - 1])
-                        Q_tentative = Function(self._V_Q)
-                        problem_tentative = LinearVariationalProblem(
-                            a_tentative, b_rhs_tentative, Q_tentative
-                        )
-                        solver_parameters = {
-                            "ksp_type": "gmres",
-                            "pc_type": "ilu",
-                        }
-                        solver_tentative = LinearVariationalSolver(
-                            problem_tentative,
-                            solver_parameters=solver_parameters,
-                        )
-                        solver_tentative.solve()
-                        self.niter_tentative.update(
-                            solver_tentative.snes.getKSP().getIterationNumber()
-                        )
-                        # step 2: compute (hybridised) pressure and velocity increment
-                        b_rhs_mixed_poisson = Constant(
-                            -1 / (self._a_impl[i, i] * self._dt)
-                        ) * self._weak_divergence(psi, Q_tentative)
-                        update = Function(self._V)
-                        its = self.pressure_solve(update, b_rhs_mixed_poisson)
-                        self.niter_pressure.update(its)
-                        # step 3: update velocity at current stage
-                        self._shift_pressure(update)
-                        Q_i.assign(
-                            assemble(
-                                Q_i
-                                + Q_tentative
+                    if self.use_projection_method:
+                        rhs_i = self._residual(w_Q, f_rhs, i, tn)
+                        Q_i.assign(self._stage_state[i].subfunctions[0])
+                        p_i.assign(self._stage_state[i].subfunctions[1])
+                        lambda_i.assign(self._stage_state[i].subfunctions[2])
+                        # Richardson iteration
+                        for _ in range(self._n_richardson):
+                            # Compute residual
+                            b_rhs_tentative = (
+                                rhs_i
+                                - inner(w_Q, Q_i) * dx
                                 + Constant(self._a_impl[i, i] * self._dt)
-                                * update.subfunctions[0]
+                                * (
+                                    self._f_impl(w_Q, Q_i, self._Qstar[i - 1])
+                                    + self._pressure_gradient(w_Q, p_i, lambda_i)
+                                )
                             )
-                        )
-                        p_i.assign(assemble(p_i + update.subfunctions[1]))
-                        lambda_i.assign(assemble(lambda_i + update.subfunctions[2]))
-                    self._stage_state[i].subfunctions[0].assign(Q_i)
-                    self._stage_state[i].subfunctions[1].assign(p_i)
-                    self._stage_state[i].subfunctions[2].assign(lambda_i)
-                else:
-                    a_implicit = (
-                        inner(w, u) * dx
-                        - Constant(self._a_impl[i, i] * self._dt)
-                        * (
-                            self._pressure_gradient(w, phi, lmbda)
-                            + self._f_impl(w, u, self._Qstar[i - 1])
-                        )
-                        + self._Gamma(psi, mu, u, phi, lmbda)
-                    )
-                    solve(
-                        a_implicit == self._residual(w, f_rhs, i, tn),
-                        self._stage_state[i],
-                        solver_parameters={
-                            "ksp_type": "gmres",
-                            "pc_type": "lu",
-                            "pc_factor_mat_solver_type": "mumps",
-                        },
-                        nullspace=self.nullspace,
-                    )
-                self._shift_pressure(self._stage_state[i])
-            its = self.pressure_solve(current_state, self._final_residual(w, f_rhs, tn))
-            self.niter_final_pressure.update(its)
+                            # step 1: compute tentative velocity
+                            with PerformanceLog("tentative_velocity_solve"):
+                                a_tentative = inner(u_Q, w_Q) * dx - Constant(
+                                    self._a_impl[i, i] * self._dt
+                                ) * self._f_impl(w_Q, u_Q, self._Qstar[i - 1])
+                                Q_tentative = Function(self._V_Q)
+                                problem_tentative = LinearVariationalProblem(
+                                    a_tentative, b_rhs_tentative, Q_tentative
+                                )
+                                solver_parameters = {
+                                    "ksp_type": "gmres",
+                                    "pc_type": "ilu",
+                                }
+                                solver_tentative = LinearVariationalSolver(
+                                    problem_tentative,
+                                    solver_parameters=solver_parameters,
+                                )
 
-            # Reconstruct pressure from velocity
-            Q_new = current_state.subfunctions[0]
-            f_new = Function(self._V_Q).interpolate(f_rhs(Constant(tn + self._dt)))
-            b_rhs_pressure_reconstruction = (
-                self._weak_divergence(psi, -f_new + dot(grad(Q_new), Q_new))
-                - mu * inner(n_, f_new) * ds
-            )
-            pressure_reconstruction = Function(self._V)
-            its = self.pressure_solve(
-                pressure_reconstruction, b_rhs_pressure_reconstruction
-            )
-            self.niter_pressure_reconstruction.update(its)
-            for idx in (1, 2):
-                current_state.subfunctions[idx].assign(
-                    pressure_reconstruction.subfunctions[idx]
+                                solver_tentative.solve()
+                            self.niter_tentative.update(
+                                solver_tentative.snes.getKSP().getIterationNumber()
+                            )
+                            # step 2: compute (hybridised) pressure and velocity increment
+                            b_rhs_mixed_poisson = Constant(
+                                -1 / (self._a_impl[i, i] * self._dt)
+                            ) * self._weak_divergence(psi, Q_tentative)
+                            update = Function(self._V)
+                            its = self.pressure_solve(update, b_rhs_mixed_poisson)
+                            self.niter_pressure.update(its)
+                            # step 3: update velocity at current stage
+                            self._shift_pressure(update)
+                            Q_i.assign(
+                                assemble(
+                                    Q_i
+                                    + Q_tentative
+                                    + Constant(self._a_impl[i, i] * self._dt)
+                                    * update.subfunctions[0]
+                                )
+                            )
+                            p_i.assign(assemble(p_i + update.subfunctions[1]))
+                            lambda_i.assign(assemble(lambda_i + update.subfunctions[2]))
+                        self._stage_state[i].subfunctions[0].assign(Q_i)
+                        self._stage_state[i].subfunctions[1].assign(p_i)
+                        self._stage_state[i].subfunctions[2].assign(lambda_i)
+                    else:
+                        with PerformanceLog("unsplit_solve"):
+                            a_implicit = (
+                                inner(w, u) * dx
+                                - Constant(self._a_impl[i, i] * self._dt)
+                                * (
+                                    self._pressure_gradient(w, phi, lmbda)
+                                    + self._f_impl(w, u, self._Qstar[i - 1])
+                                )
+                                + self._Gamma(psi, mu, u, phi, lmbda)
+                            )
+                            solve(
+                                a_implicit == self._residual(w, f_rhs, i, tn),
+                                self._stage_state[i],
+                                solver_parameters={
+                                    "ksp_type": "gmres",
+                                    "pc_type": "lu",
+                                    "pc_factor_mat_solver_type": "mumps",
+                                },
+                                nullspace=self.nullspace,
+                            )
+                    self._shift_pressure(self._stage_state[i])
+                its = self.pressure_solve(
+                    current_state, self._final_residual(w, f_rhs, tn)
                 )
-            self._shift_pressure(current_state)
-        t_finish = time.clock_gettime_ns(time.CLOCK_REALTIME)
+                self.niter_final_pressure.update(its)
+
+                # Reconstruct pressure from velocity
+                Q_new = current_state.subfunctions[0]
+                f_new = Function(self._V_Q).interpolate(f_rhs(Constant(tn + self._dt)))
+                b_rhs_pressure_reconstruction = (
+                    self._weak_divergence(psi, -f_new + dot(grad(Q_new), Q_new))
+                    - mu * inner(n_, f_new) * ds
+                )
+                pressure_reconstruction = Function(self._V)
+                its = self.pressure_solve(
+                    pressure_reconstruction, b_rhs_pressure_reconstruction
+                )
+                self.niter_pressure_reconstruction.update(its)
+                for idx in (1, 2):
+                    current_state.subfunctions[idx].assign(
+                        pressure_reconstruction.subfunctions[idx]
+                    )
+                self._shift_pressure(current_state)
+        print()
         print(
             f"average number of tentative velocity solver iterations      : {self.niter_tentative.value:8.2f}"
         )
         if self.use_projection_method:
-            print()
             print(
                 f"average number of pressure solver iterations                : {self.niter_pressure.value:8.2f}"
             )
@@ -528,10 +535,6 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         print(
             f"average number of pressure reconstruction solver iterations : {self.niter_pressure_reconstruction.value:8.2f}"
         )
-        t_elapsed = 1.0e-9 * (t_finish - t_start)
-        print()
-        print(f"elapsed time       = {t_elapsed:10.4f} s")
-        print(f"time per iteration = {(t_elapsed/nt):10.4f} s")
         return current_state.subfunctions[0], current_state.subfunctions[1]
 
 

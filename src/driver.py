@@ -6,6 +6,8 @@ import argparse
 from firedrake import *
 from firedrake.output import VTKFile
 
+from auxilliary.logging import log_summary
+
 from timesteppers.conforming_implicit import *
 from timesteppers.dg_implicit import *
 from timesteppers.hdg_implicit import *
@@ -284,3 +286,5 @@ if __name__ == "__main__":
 
     outfile = VTKFile("solution.pvd")
     outfile.write(Q, Q_exact, Q_error, p, p_exact, p_error, divQ)
+
+    log_summary()
