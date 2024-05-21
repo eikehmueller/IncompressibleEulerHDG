@@ -4,6 +4,8 @@
 \usepackage{graphicx}
 \usepackage[margin=2cm]{geometry}
 \usepackage{tikz}
+\usepackage{soul}
+\usepackage{xfrac}
 \usepackage[tikz]{mdframed}
 \mdfdefinestyle{hlframe}{%      
 frametitlebackgroundcolor   =black!15,%                                    
@@ -105,7 +107,7 @@ and assume that
     \begin{aligned}
         Q \in V_Q & := [\text{DG}_{k+1}]^d,                    \\
         p \in Q_p & := \text{DG}_{k}\cap \{v:(v)_{\Omega}=0\}. \\
-    \end{aligned}
+    \end{aligned}\label{eqn:function_spaces}
 \end{equation}
 We start by post-processing the velocity $Q$ into the divergence free advection velocity $Q^\star$ which is defined as follows:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -319,7 +321,7 @@ The coefficients that define a particular IMEX method are usually written down i
 
 The stage variables $Q_1,Q_2,\dots,Q_{s-1}\in V_Q$, $p_1,p_2,\dots,p_{s-1}\in V_p$ and $\lambda_1,\lambda_2,\dots,\lambda_{s-1}\in V_{\text{trace}}$ are obtained by: for $i=1,2,\dots,s-1$ find $(Q_i,p_i,\lambda_i)\in V_Q\times V_p\times V_{\text{trace}}$ such that
 \begin{equation}
-    \left((Q_i\cdot w)_{\Omega_h} - \Delta t\; a_{i,i}^\impl \big(f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))+g(w,p_i,\lambda_i)\big)\right)
+    (Q_i\cdot w)_{\Omega_h} - \Delta t\; a_{i,i}^\impl \big(f^\impl(w,Q_i,\mathcal{P}(Q_{i-1}))+g(w,p_i,\lambda_i)\big)
     = r_i(w)\qquad\text{for all $w\in V_Q$}\label{eqn:imex_implicit_solve}
 \end{equation}
 with $Q_0=Q^n$, $p_0=p^n$ subject to the constraint
@@ -405,7 +407,7 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
                 \begin{aligned}
                     (\delta Q\cdot w)_{\Omega_h} - g(w,\delta p,\delta \lambda) & = -\frac{1}{a_{i,i}^\impl \Delta t} \text{Div}(w,\overline{Q}) \\
                     \Gamma(\psi,\mu,\delta p,\delta \lambda)                    & = 0
-                \end{aligned}
+                \end{aligned}\label{eqn:pressure_increment}
             \end{equation}
         }
         \State{\textbf{Step III}: Update
@@ -420,9 +422,56 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
     \end{algorithmic}
 \end{algorithm}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Pressure reconstruction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The pressure $p$ can be reconstructed from the velocity $Q$ at a given time by solving an elliptic problem. To see this, take the divergence of the first line of Eq. \eqref{eqn:incompressible_euler} in the domain $\Omega$ and mutiply it by the outward normal $n$ on the boundary $\partial \Omega$. Since $\nabla\cdot \partial_t Q = 0$ in $\Omega$ and $n\cdot \partial_t Q=0$ on $\partial \Omega$, this results in the following boundary value problem
+\begin{equation}
+    \begin{aligned}
+        -\Delta p        & = \nabla \cdot f_p\qquad\text{in $\Omega$}    \\
+        -n\cdot \nabla p & = n\cdot f_p \qquad\text{on $\partial\Omega$}
+    \end{aligned}\label{eqn:pressure_reconstruction_primal}
+\end{equation}
+with the function
+\begin{equation}
+    f_p := -f + (Q\cdot \nabla) Q.
+\end{equation}
+To make the solution $p$ of Eq. \eqref{eqn:pressure_reconstruction_primal} unique, we require that $\int_\Omega p\;dx=0$. The expression $n\cdot f_p\vert_{\partial \Omega}$ can be simplified as follows: Since $n\cdot Q\vert_{\partial \Omega}=0$, we can write on the boundary
+\begin{equation}
+    \begin{aligned}
+        n\cdot f_p & = -n\cdot f + (Q\cdot \nabla) (n\cdot Q)                   \\
+                   & = -n\cdot f+(Q^\parallel \cdot \nabla^\parallel)(n\cdot Q) \\
+                   & = -n\cdot f
+    \end{aligned}\label{eqn:n_dot_fp}
+\end{equation}
+where $Q^\parallel$ is the part of $Q$ that is tangential to the boundary and similarly $\nabla^\parallel$ is the derivative in the tangential direction. The final line in Eq. \eqref{eqn:n_dot_fp} follows since on the boundary $n\cdot Q=0$ obviously does not change in the tangential direction.
+
+By introducing the new variable $U$, the second order problem in Eq. \eqref{eqn:pressure_reconstruction_primal} can be written in mixed form as
+\begin{xalignat}{2}
+    U + \nabla p &= 0,& \nabla \cdot U &= \nabla \cdot f_p\label{eqn:mixed_poisson_reconstruction}
+\end{xalignat}
+subject to the boundary condition $n\cdot U\vert_{\partial \Omega} = -n\cdot f$. Eq. \eqref{eqn:mixed_poisson_reconstruction} can be solved through hybridisation in exactly the same way as the corresponding problem in Eq. \eqref{eqn:mixed_poisson_continuum}. For this, we solve the following weak problem (c.f. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness}):
+find $(U,p,\lambda) \in V_Q\times V_p\times V_{\text{trace}}$ such that
+\begin{subequations}
+    \begin{align}
+        (U\cdot w)_{\Omega_h} - (p \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda\rangle_{F} & = 0\label{eqn:mixed_poisson_reconstruction_velocity}                    \\
+        (\psi \nabla\cdot U)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p-\lambda)\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p - \lambda)\psi\rangle_{F}   & = \text{Div}(\psi,f_p)\label{eqn:mixed_poisson_reconstruction_pressure} \\
+        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{U\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(U\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}  & = -\sum_{F\in\mathcal{E}_h^\partial}\langle \mu n\cdot f\rangle_F
+        \label{eqn:mixed_poisson_reconstruction_uniqueness}
+    \end{align}
+\end{subequations}
+for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$. The weak divergence operator $\text{Div}(\psi,\cdot)$ that appears on the right hand side of Eq. \eqref{eqn:mixed_poisson_reconstruction_pressure} is defined in Eq. \eqref{eqn:weak_divergence}.
+The three equations in Eqs. \eqref{eqn:mixed_poisson_reconstruction_velocity}, \eqref{eqn:mixed_poisson_reconstruction_pressure} and \eqref{eqn:mixed_poisson_reconstruction_uniqueness} can be written in compact form as
+\begin{equation}
+    \begin{aligned}
+        (U\cdot w)_{\Omega_h} - g(w,p,\lambda) & = \text{Div}(\psi,f_p)                                            \\
+        \Gamma(\psi,\mu,U,p,\lambda)           & = -\sum_{F\in\mathcal{E}_h^\partial}\langle \mu n\cdot f\rangle_F
+    \end{aligned}\label{eqn:pressure_reconstruction_compact}
+\end{equation}
+which has the same structure as Eqs. \eqref{eqn:final_update} and \eqref{eqn:pressure_increment}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Butcher Tableaus}\label{sec:butcher_tableaus}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-The coefficients $a_{i,j}^\impl$, $a_{i,j}^\expl$, $b_{i}^\impl$, $b_{i}^\expl$ and $c_j$ that define a particular IMEX method can be written in the form of Butcher-Tableaus, see Tab. \ref{tab:butcher_tableaus}. The Butcher-Tableaus for a range of IMEX methods can be found for example in \cite{Weller2013}, for reference the ARS(2,3,2) method is shown in Tab. \ref{tab:butcher_tableau_ars232}.
+The coefficients $a_{i,j}^\impl$, $a_{i,j}^\expl$, $b_{i}^\impl$, $b_{i}^\expl$ and $c_j$ that define a particular IMEX method can be written in the form of Butcher-Tableaus, see Tab. \ref{tab:butcher_tableaus}. The Butcher-Tableaus for a range of IMEX methods can be found for example in \cite{Weller2013}.
 \begin{table}
     \begin{minipage}{0.45\linewidth}
         \begin{center}
@@ -456,83 +505,195 @@ The coefficients $a_{i,j}^\impl$, $a_{i,j}^\expl$, $b_{i}^\impl$, $b_{i}^\expl$ 
     \caption{Generic form of Butcher Tableaus for IMEX methods considered here (recall that we assume that $a_{i,0}^\impl = b_0^\impl=0$ and hence the first column of the implicit tableau on the right hand side contains only zeros).}
     \label{tab:butcher_tableaus}
 \end{table}
+For reference the Butcher tableaus for the timestepping method that are used for our numerical experiments are  shown in Tabs. \ref{tab:butcher_tableau_imex_euler}, \ref{tab:butcher_tableau_ssp2_332} and \ref{tab:butcher_tableau_ssp3_433}.
 \begin{table}
-    \begin{minipage}{0.25\linewidth}
-        \begin{center}
-            \begin{tabular}{c|ccc}
-                0        & 0        & 0          & 0        \\
-                $\gamma$ & $\gamma$ & 0          & 0        \\
-                1        & $\delta$ & $1-\delta$ & 0        \\
-                \hline
-                         & 0        & $1-\gamma$ & $\gamma$
-            \end{tabular}
-        \end{center}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.25\linewidth}
-        \begin{center}
-            \begin{tabular}{|ccc}
-                0 & 0          & 0        \\
-                0 & $\gamma$   & 0        \\
-                0 & $1-\gamma$ & $\gamma$ \\
-                \hline
-                0 & $1-\gamma$ & $\gamma$
-            \end{tabular}
-        \end{center}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.35\linewidth}
-        \begin{xalignat*}{2}
-            \gamma & = 1 - \frac{1}{\sqrt{2}},&
-            \delta & = -\frac{2}{3}\sqrt{2}
-        \end{xalignat*}
-    \end{minipage}
-    \caption{Butcher Tableaus for the ARS(2,3,2) method, see \cite[Fig. 2]{Weller2013}}
-    \label{tab:butcher_tableau_ars232}
+    \begin{center}
+        \begin{minipage}{0.25\linewidth}
+            \begin{center}
+                \begin{tabular}{c|cc}
+                    0 & 0 & 0 \\
+                    1 & 1 & 0 \\
+                    \hline
+                      & 1 & 0
+                \end{tabular}
+            \end{center}
+        \end{minipage}
+        \hspace{4ex}
+        \begin{minipage}{0.25\linewidth}
+            \begin{center}
+                \begin{tabular}{|cc}
+                    0 & 0 \\
+                    0 & 1 \\
+                    \hline
+                    0 & 1
+                \end{tabular}
+            \end{center}
+        \end{minipage}
+        \caption{Butcher Tableaus for the IMEX Euler method}
+        \label{tab:butcher_tableau_imex_euler}
+    \end{center}
+\end{table}
+\begin{table}
+    \begin{center}
+        \begin{minipage}{0.25\linewidth}
+            \begin{center}
+                \begin{tabular}{c|ccc}
+                    0              & 0              & 0              & 0              \\
+                    1              & $\sfrac{1}{2}$ & 0              & 0              \\
+                    $\sfrac{1}{2}$ & $\sfrac{1}{2}$ & $\sfrac{1}{2}$ & 0              \\
+                    \hline
+                                   & $\sfrac{1}{3}$ & $\sfrac{1}{3}$ & $\sfrac{1}{3}$
+                \end{tabular}
+            \end{center}
+        \end{minipage}
+        \hspace{4ex}
+        \begin{minipage}{0.25\linewidth}
+            \begin{center}
+                \begin{tabular}{|ccc}
+                    $\sfrac{1}{4}$ & 0              & 0              \\
+                    0              & $\sfrac{1}{4}$ & 0              \\
+                    $\sfrac{1}{3}$ & $\sfrac{1}{3}$ & $\sfrac{1}{3}$ \\
+                    \hline
+                    $\sfrac{1}{3}$ & $\sfrac{1}{3}$ & $\sfrac{1}{3}$
+                \end{tabular}
+            \end{center}
+        \end{minipage}
+        \caption{Butcher Tableaus for the SSP2(3,3,2) method, see \cite[Fig. 2]{Weller2013}}
+        \label{tab:butcher_tableau_ssp2_332}
+    \end{center}
+\end{table}
+\begin{table}
+    \begin{center}
+        \begin{minipage}{0.25\linewidth}
+            \begin{center}
+                \begin{tabular}{c|cccc}
+                    0              & 0 & 0              & 0              & 0              \\
+                    0              & 0 & 0              & 0              & 0              \\
+                    1              & 0 & 1              & 0              & 0              \\
+                    $\sfrac{1}{2}$ & 0 & $\sfrac{1}{4}$ & $\sfrac{1}{4}$ & 0              \\
+                    \hline
+                                   & 0 & $\sfrac{1}{6}$ & $\sfrac{1}{6}$ & $\sfrac{2}{3}$
+                \end{tabular}
+            \end{center}
+        \end{minipage}
+        \hspace{4ex}
+        \begin{minipage}{0.25\linewidth}
+            \begin{center}
+                \begin{tabular}{|cccc}
+                    $\alpha$  & 0              & 0              & 0              \\
+                    $-\alpha$ & $\alpha$       & 0              & 0              \\
+                    0         & $1-\alpha$     & $\alpha$       & 0              \\
+                    $\beta$   & $\eta$         & $\delta$       & $\alpha$       \\
+                    \hline
+                    0         & $\sfrac{1}{6}$ & $\sfrac{1}{6}$ & $\sfrac{2}{3}$
+                \end{tabular}
+            \end{center}
+        \end{minipage}
+        \hspace{4ex}
+        \begin{minipage}{0.25\linewidth}
+            \begin{equation*}
+                \begin{aligned}
+                    \alpha & = 0.2416942608                         \\
+                    \beta  & = 0.0604235652                         \\
+                    \eta   & = 0.1291528696                         \\
+                    \delta & = \sfrac{1}{2} - \alpha - \beta - \eta
+                \end{aligned}
+            \end{equation*}
+        \end{minipage}
+        \caption{Butcher Tableaus for the SSP3(4,3,3) method, see \cite[Fig. 2]{Weller2013}}
+        \label{tab:butcher_tableau_ssp3_433}
+    \end{center}
 \end{table}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Pressure reconstruction}
+\section{Results}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-The pressure $p$ can be reconstructed from the velocity $Q$ at a given time by solving an elliptic problem. To see this, take the divergence of the first line of Eq. \eqref{eqn:incompressible_euler} in the domain $\Omega$ and mutiply it by the outward normal $n$ on the boundary $\partial \Omega$. Since $\nabla\cdot \partial_t Q = 0$ in $\Omega$ and $n\cdot \partial_t Q=0$ on $\partial \Omega$, this results in the following boundary value problem
-\begin{equation}
-    \begin{aligned}
-        -\Delta p        & = \nabla \cdot f_p\qquad\text{in $\Omega$}    \\
-        -n\cdot \nabla p & = n\cdot f_p \qquad\text{on $\partial\Omega$}
-    \end{aligned}\label{eqn:pressure_reconstruction_primal}
-\end{equation}
-with the function
-\begin{equation}
-    f_p := -f + (Q\cdot \nabla) Q.
-\end{equation}
-To make the solution $p$ of Eq. \eqref{eqn:pressure_reconstruction_primal} unique, we require that $\int_\Omega p\;dx=0$. The expression $n\cdot f_p\vert_{\partial \Omega}$ can be simplified as follows: Since $n\cdot Q\vert_{\partial \Omega}=0$, we can write on the boundary
-\begin{equation}
-    \begin{aligned}
-    n\cdot f_p &= -n\cdot f + (Q\cdot \nabla) (n\cdot Q) \\
-    &= -n\cdot f+(Q^\parallel \cdot \nabla^\parallel)(n\cdot Q)\\
-    &= -n\cdot f
-    \end{aligned}\label{eqn:n_dot_fp}
-\end{equation}
-where $Q^\parallel$ is the part of $Q$ that is tangential to the boundary and similarly $\nabla^\parallel$ is the derivative in the tangential direction. The final line in Eq. \eqref{eqn:n_dot_fp} follows since on the boundary $n\cdot Q=0$ obviously does not change in the tangential direction.
-
-By introducing the new variable $U$, the second order problem in Eq. \eqref{eqn:pressure_reconstruction_primal} can be written in mixed form as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Experimental setup}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+To test the methods, we apply them to solve the problem with an exact solution written down in Appendix \ref{sec:exact_solution}. We choose $\Psi(t)=e^{-\kappa t}$, the initial condition $Q_0$ and forcing function $f$ that define Eq. \eqref{eqn:incompressible_euler} are then given according to Eq. \eqref{eqn:forcing_exact} as
 \begin{xalignat}{2}
-    U + \nabla p &= 0,& \nabla \cdot U &= \nabla \cdot f_p\label{eqn:mixed_poisson_reconstruction}
+    Q_0(x,y) &= \begin{pmatrix}-\cos\left(\frac{2x-1}{2}\pi\right)\sin\left(\frac{2y-1}{2}\pi\right) \\
+        \sin\left(\frac{2x-1}{2}\pi\right)\cos\left(\frac{2y-1}{2}\pi\right)\end{pmatrix},&
+    f(x,y,t) &= -\kappa e^{-\kappa t} Q_0(x,y)
 \end{xalignat}
-subject to the boundary condition $n\cdot U\vert_{\partial \Omega} = -n\cdot f$. Eq. \eqref{eqn:mixed_poisson_reconstruction} can be solved through hybridisation in exactly the same way as the corresponding problem in Eq. \eqref{eqn:mixed_poisson_continuum}. For this, we solve the following weak problem (c.f. Eqs. \eqref{eqn:mixed_poisson_velocity} - \eqref{eqn:mixed_poisson_uniqueness}):
-find $(U,p,\lambda) \in V_Q\times V_p\times V_{\text{trace}}$ such that
-\begin{subequations}
-    \begin{align}
-        (U\cdot w)_{\Omega_h} - (p \nabla\cdot w)_{\Omega_h} +  \sum_{F\in\mathcal{E}_h^i} \langle \jump{w\cdot n}\lambda\rangle_{F}  +  \sum_{F\in\mathcal{E}_h^\partial} \langle (w\cdot n)\lambda\rangle_{F} & = 0\label{eqn:mixed_poisson_reconstruction_velocity}                    \\
-        (\psi \nabla\cdot U)_{\Omega_h} + 2 \sum_{F\in\mathcal{E}_h^i} \langle \avg{\tau (p-\lambda)\psi}\rangle_{F}            + \sum_{F\in\mathcal{E}_h^\partial} \langle \tau (p - \lambda)\psi\rangle_{F}   & = \text{Div}(\psi,f_p)\label{eqn:mixed_poisson_reconstruction_pressure} \\
-        \sum_{F\in\mathcal{E}_h^i} \langle \left(\jump{U\cdot n}+2\tau \avg{p-\lambda}\right)\mu \rangle_{F} + \sum_{F\in\mathcal{E}_h^\partial} \langle \left(U\cdot n+\tau (p-\lambda)\right)\mu \rangle_{F}  & = -\sum_{F\in\mathcal{E}_h^\partial}\langle \mu n\cdot f\rangle_F
-        \label{eqn:mixed_poisson_reconstruction_uniqueness}
-    \end{align}
-\end{subequations}
-for all test functions $(w,\psi,\mu) \in V_Q\times V_p\times V_{\text{trace}}$. The weak divergence operator $\text{Div}(\psi,\cdot)$ that appears on the right hand side of Eq. \eqref{eqn:mixed_poisson_reconstruction_pressure} is defined in Eq. \eqref{eqn:weak_divergence}.
+and we set $\kappa=0.5$ in all numerical experiments. The final time is set to $T=1$.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Timestepping methods.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We choose timesteppers such that the order of the method is the same as the polynomial degree $k$ used to discretise the pressure field. The following three setups are considered here:
+\begin{enumerate}
+    \item The two-stage implicit Euler method with $k=1$
+    \item The three-stage SSP2(3,3,2) method with $k=2$
+    \item The four-stage SSP3(4,3,3) method with $k=3$
+\end{enumerate}
+Recall that according to Eq. \eqref{eqn:function_spaces} the components of the velocity field are represented by polynomials of degree $k+1$. Numerical experiments are carried out on grids of size $n\times n$. Since the cells are right-angles triangles with two sides of length $h=1/n$, each grid contains $2n^2$ cells; we will refer to $n$ as the ``grid size'' in the following. The number of timesteps is set to $n_t=n$ which results in a timestep size of $\Delta t=h$.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Solvers and preconditioners.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+To compute the tentative velocity (see Eq. \eqref{eqn:tentative_velocity}) we use a GMRES solver with ILU0 preconditioner. To solve the mixed problem in Eqs. \eqref{eqn:final_update}, \eqref{eqn:pressure_increment} and \eqref{eqn:pressure_reconstruction_compact} we first use a Schur-complement reduction method to reduce the problem to an equation for the facet variables $\lambda$; in Firedrake this is realised with the static condensation preconditioner class \texttt{firedrake.SCPC}. The resulting system is then solved with a GMRES iteration, preconditioned with the non-nested multigrid method described in \cite{Cockburn2014} (class \texttt{firedrake.GTMGPC}). On the finest level, a Chebyshev smoother based on the block-diagonal is used such that the matrix which couples the unknowns on each facet is inverted exactly; this is achieved with \texttt{firedrake.ASMStarPC}. For simplicity, the coarse level problem is solved with a standard AMG method with Chebyshev smoothers. Two pre- and post-smoothing iterations are used on all levels. In the non-nested multigrid algorithm the coarse level space consists of piecewise linear conforming elements, i.e. it is formulated in the space
+\begin{equation}
+    V_{c} = \text{P}_1 := \{ v\in C(\Omega) : v|_K \in P_1(K) \;\text{for all}\;K\in \Omega_h \}.
+\end{equation}
+The weak form on the coarse level is
+\begin{equation}
+    a_{c}(\phi_c,\psi_c) = -(\nabla \psi_c \cdot \nabla \phi_c)_{\Omega_h}\qquad\text{for all $\phi_c,\psi_c\in V_{c}$}
+\end{equation}
+and the prolongation $\mathscr{P}:V_c\rightarrow V_{\text{trace}}$ is defined by
+\begin{xalignat}{2}
+    \mathscr{P}&: \phi_c \mapsto \phi, &
+    \langle \mu \phi_c \rangle_{\mathcal{E}_h} & =\langle \mu \phi \rangle_{\mathcal{E}_h} \qquad\text{for all $\mu\in V_{\text{trace}}$}.
+\end{xalignat}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Error}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We start by verifying that the numerical solution converges to the exact solution given in Eqs. \eqref{eqn:exact_solution}. Fig. \ref{fig:spatial_error} shows the spatial distribution of the error on a $16\times 16$ grid with a SSP2(3,3,2) timestepper and $k=2$. As the figure shows, the error is distributed approximately uniformly across the domain.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=1.0\linewidth]{figures/error_spatial.png}
+        \caption{Spatial distribution of the error in velocity (left) and pressure (right) on a $16\times 16$ grid. Results are obtained with a SSP2(3,3,2) timestepper and a polynomial degree of $k=2$.}
+        \label{fig:spatial_error}
+    \end{center}
+\end{figure}
+Next, Fig. \ref{fig:L2error} shows how the error in the $L_2$ depends on the grid size for different polynomial degrees. For both velocity and pressure we observe convergence with the asymptotic rate  $\propto h^{k}\propto (\Delta t)^k$.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=0.75\linewidth]{figures/L2error.pdf}
+        \caption{$L_2$ error norm in velocity (left) and pressure (right) for different grid sizes and polynomial degrees.}
+        \label{fig:L2error}
+    \end{center}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Performance}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Next, we investigate the performance of the methods. Recall that an $s$-stage method with $n_R$ Richardson iterations requires $sn_R$ solves for the tentative velocity and $sn_R+2$ pressure solves and we expect these to dominate the total cost \hl{measure breakdown of runtime to quantify this}. Since both solves are performed with iterative methods, it is crucial to quantify the number of solver iterations that are required to achieve convergence. Fig. \ref{fig:niter} shows the average number of iterations\footnote{For the pressure solver, we only consider the final pressure solve in each timestep. However, we verified that the other solves require approximately the same number of iterations.} as a function of the grid size both for the tentative velocity solver and the pressure solver. The figure demonstrates that empirically both solvers are robust as the grid size $n$ and polynomial degree $k$ increases. Since (ideally) each solver iteration incurs a cost proportional to the number of unknowns, we therefore expect the cost of a single timestep to be proportial to number of unknowns for a given timestepper and polynomial degree $k$.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=0.75\linewidth]{figures/niter.pdf}
+        \caption{Number of solver as a function of the grid size for different polynomial degrees.}
+        \label{fig:niter}
+    \end{center}
+\end{figure}
+This time per timestep is plotted as a function of the grid size for different polynomial degrees in Fig. \ref{fig:titer}. Naturally, this cost increases for higher polynomial degrees $k$. For fixed $k$ it appears to grow slightly faster than the number of unknowns. This might be due to the fact that the cost of a single solver iteration grows faster \hl{Maybe this is due to the AMG solver? Need to look at more detailed breakdown of runtime.}.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=0.75\linewidth]{figures/titer.pdf}
+        \caption{Time per timestep as a function of the grid size for different polynomial degrees.}
+        \label{fig:titer}
+    \end{center}
+\end{figure}
+The most useful metric to quantify the performance of a given setup is the total runtime for a given error. We plot this time as a function of both the $L_2$ velocity error norm and the $L_2$ pressure error norm in Fig. \ref{fig:ttotal}. For a fixed error budget higher order integrator have a significantly smaller overall runtime as the bound on the error decreases.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=0.75\linewidth]{figures/ttotal.pdf}
+        \caption{Total runtime for different values of the $L_2$ error in velocity (left) and pressure (right).}
+        \label{fig:ttotal}
+    \end{center}
+\end{figure}
+\clearpage
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \appendix
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Exact solution}
+\section{Exact solution}\label{sec:exact_solution}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 An exact solution of the two-dimensional incompressible Euler equations in Eq. \eqref{eqn:incompressible_euler} is given by for the stationary case $f=0$ by
 \begin{equation}
@@ -548,12 +709,12 @@ where
 \end{xalignat}
 Note that the derivatives of these functions satisfy $S'(z)=\pi C(z)$ and $C'(z)=-\pi S(z)$. From this a divergence-free time-dependent solution for the special case
 \begin{equation}
-    f = \frac{d\Psi}{dt} Q_s(x,y).
+    f = \frac{d\Psi}{dt} Q_s(x,y).\label{eqn:forcing_exact}
 \end{equation}
 with arbitrary scalar function $\Psi(t)$ can be constructed as
 \begin{xalignat}{2}
     Q(x,y,t) & = \Psi(t)Q_s(x,y),&
-    p(x,y,t) & = \Psi(t)^2 p_s(x,y).
+    p(x,y,t) & = \Psi(t)^2 p_s(x,y).\label{eqn:exact_solution}
 \end{xalignat}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \bibliographystyle{unsrt}
