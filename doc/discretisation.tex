@@ -55,7 +55,7 @@ frametitlebackgroundcolor   =black!15,%
 \date{\today}
 \begin{document}
 \maketitle
-The goal of this note is to derive a hybridisable discontinuous Galerkin (HDG) projection method \cite{Chorin1968} for the time-dependent incompressible Euler equation, similar to \cite{Ueckermann2016} where this approach is applied to the Navier-Stokes equations. While in \cite{Ueckermann2016} the presence of the Stokes term requires the hybridisation of both the tentative velocity computation and the pressure solve, for the incompressible Euler equations this is only required in the latter step. The starting point of our derivation is the fully implicit DG formulation of the incompressible Euler equations in \cite{Guzman2016}. Similar to \cite{Ueckermann2016}, we also discuss higher-order IMEX timestepping methods \cite{Ascher1997}.
+The goal of this note is to derive a hybridisable discontinuous Galerkin (HDG) projection method \cite{Chorin1968} for the time-dependent incompressible Euler equation, similar to \cite{Ueckermann2016} where this approach is applied to the Navier-Stokes equations. While in \cite{Ueckermann2016} the presence of the Stokes term requires the hybridisation of both the tentative velocity computation and the pressure solve, for the incompressible Euler equations this is only required in the latter step. The starting point of our derivation is the fully implicit DG formulation of the incompressible Euler equations in \cite{Guzman2016}. Similar to \cite{Ueckermann2016}, we also discuss higher-order IMEX timestepping methods \cite{Ascher1997}. To solve the resulting mixed pressure equation we use a Schur-complement approach and the non-nested multigrid preconditioner described in \cite{Cockburn2014}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Continuum equations}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -274,7 +274,7 @@ Having computed $\overline{Q}$ with Eq. \eqref{eqn:tentative_velocity} and $\del
     Q^{n+1} = \overline{Q} + \Delta t\; \delta Q.
 \end{equation}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{IMEX timestepping}
+\section{IMEX timestepping}\label{sec:imex}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 The above method uses a simple timestepping approach and we therefore expect it to be first order in time. This can be improved by using the higher-order IMEX \cite{Ascher1997} scheme described in \cite[Section 4]{Ueckermann2016}.
 
@@ -603,17 +603,17 @@ For reference the Butcher tableaus for the timestepping method that are used for
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Experimental setup}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-To test the methods, we apply them to solve the problem with an exact solution written down in Appendix \ref{sec:exact_solution}. We choose $\Psi(t)=e^{-\kappa t}$, the initial condition $Q_0$ and forcing function $f$ that define Eq. \eqref{eqn:incompressible_euler} are then given according to Eq. \eqref{eqn:forcing_exact} as
+To test the IMEX timestepping methods described in Section \ref{sec:imex}, we solve the problem with an exact solution written down in Appendix \ref{sec:exact_solution}. Setting $\Psi(t)=e^{-\kappa t}$ the initial condition $Q_0$ and forcing function $f$ that define Eq. \eqref{eqn:incompressible_euler} are then given according to Eq. \eqref{eqn:forcing_exact} as
 \begin{xalignat}{2}
     Q_0(x,y) &= \begin{pmatrix}-\cos\left(\frac{2x-1}{2}\pi\right)\sin\left(\frac{2y-1}{2}\pi\right) \\
-        \sin\left(\frac{2x-1}{2}\pi\right)\cos\left(\frac{2y-1}{2}\pi\right)\end{pmatrix},&
+        \sin\left(\frac{2x-1}{2}\pi\right)\cos\left(\frac{2y-1}{2}\pi\right)\end{pmatrix};&
     f(x,y,t) &= -\kappa e^{-\kappa t} Q_0(x,y)
 \end{xalignat}
-and we set $\kappa=0.5$ in all numerical experiments. The final time is set to $T=1$.
+we set $\kappa=0.5$ in all numerical experiments. The final time is fixed at $T=1$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \paragraph{Timestepping methods.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-We choose timesteppers such that the order of the method is the same as the polynomial degree $k$ used to discretise the pressure field. The following three setups are considered here:
+We pick timesteppers such that the order of the method is the same as the polynomial degree $k$ used to discretise the pressure field; in this case we would expect that the temporal and spatial order of convergence are the same. The following three setups are considered here:
 \begin{enumerate}
     \item The two-stage implicit Euler method with $k=1$
     \item The three-stage SSP2(3,3,2) method with $k=2$
@@ -658,7 +658,7 @@ Next, Fig. \ref{fig:L2error} shows how the error in the $L_2$ depends on the gri
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Performance}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Next, we investigate the performance of the methods. Recall that an $s$-stage method with $n_R$ Richardson iterations requires $sn_R$ solves for the tentative velocity and $sn_R+2$ pressure solves and we expect these to dominate the total cost \hl{measure breakdown of runtime to quantify this}. Since both solves are performed with iterative methods, it is crucial to quantify the number of solver iterations that are required to achieve convergence. Fig. \ref{fig:niter} shows the average number of iterations\footnote{For the pressure solver, we only consider the final pressure solve in each timestep. However, we verified that the other solves require approximately the same number of iterations.} as a function of the grid size both for the tentative velocity solver and the pressure solver. The figure demonstrates that empirically both solvers are robust as the grid size $n$ and polynomial degree $k$ increases. Since (ideally) each solver iteration incurs a cost proportional to the number of unknowns, we therefore expect the cost of a single timestep to be proportial to number of unknowns for a given timestepper and polynomial degree $k$.
+Next, we investigate the performance of the methods. Recall that an $s$-stage method with $n_R$ Richardson iterations requires $(n_R-1)s$ solves for the tentative velocity and $(n_R-2)s+2$ pressure solves and we expect these to dominate the total cost \hl{measure breakdown of runtime to quantify this}. Since both solves are performed with iterative methods, it is crucial to quantify the number of solver iterations that are required to achieve convergence. Fig. \ref{fig:niter} shows the average number of iterations\footnote{For the pressure solver, we only consider the final pressure solve in each timestep. However, we verified that the other solves require approximately the same number of iterations.} as a function of the grid size both for the tentative velocity solver and the pressure solver. The figure demonstrates that empirically both solvers are robust as the grid size $n$ and polynomial degree $k$ increases. Since (ideally) each solver iteration incurs a cost proportional to the number of unknowns, we therefore expect the cost of a single timestep to be proportial to number of unknowns for a given timestepper and polynomial degree $k$.
 \begin{figure}
     \begin{center}
         \includegraphics[width=0.75\linewidth]{figures/niter.pdf}
