@@ -350,9 +350,6 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
     \label{alg:imex_hdg}
     \begin{algorithmic}[1]
         \State{Initialise $Q_0:=Q^n$, $p_0:=p^n$}
-        \If {$n=0$}
-        \State{Compute $\lambda_0$ by solving Eqs. \eqref{eqn:jump_condition_interior} and \eqref{eqn:jump_condition_boundary} for $\lambda$, given $Q=Q^n$, $p=p^n$.}
-        \EndIf
         \For {$i=1,\dots,s-1$}
         \State{Compute the residual $r_i(w)$ defined in Eq. \eqref{eqn:imex_residual}}
         \State{Set $Q^\star_{i-1}:=\mathcal{P}(Q_{i-1})$}
@@ -377,11 +374,7 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
                 r^{n+1}(w) & := (w\cdot Q^n)_{\Omega_h} +  \sum_{i=1}^{s-1} \frac{b_i^\impl}{a_{i,i}^\impl} \big((Q_i\cdot w)_{\Omega_h}-r_i(w)\big) +\Delta t \sum_{i=0}^{s-1} b_i^\expl f^\expl(w;t^n+c_i \Delta t) .
             \end{aligned}\label{eqn:final_residual}
         \end{equation}
-        \State{Compute the (hybridised) pressure at the next timestep as
-            \begin{xalignat}{2}
-                p^{n+1} &= p_{s-1}+\delta p, &
-                \lambda^{n+1} &= \lambda_{s-1}+\delta\lambda
-            \end{xalignat}}
+        \State{Reconstruct the (hybridised) pressure at the next timestep by solving Eq. \eqref{eqn:pressure_reconstruction_compact} for $p=p^{n+1}$, $\lambda=\lambda^{n+1}$.}
     \end{algorithmic}
 \end{algorithm}
 \begin{algorithm}
@@ -422,7 +415,7 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
     \end{algorithmic}
 \end{algorithm}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Pressure reconstruction}
+\subsection{Pressure reconstruction}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 The pressure $p$ can be reconstructed from the velocity $Q$ at a given time by solving an elliptic problem. To see this, take the divergence of the first line of Eq. \eqref{eqn:incompressible_euler} in the domain $\Omega$ and mutiply it by the outward normal $n$ on the boundary $\partial \Omega$. Since $\nabla\cdot \partial_t Q = 0$ in $\Omega$ and $n\cdot \partial_t Q=0$ on $\partial \Omega$, this results in the following boundary value problem
 \begin{equation}
