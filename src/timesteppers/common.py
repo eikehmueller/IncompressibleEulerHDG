@@ -71,6 +71,30 @@ class IncompressibleEuler(ABC):
                 "By": (coords_y, READ),
             },
         )
+        u, gamma, omega = TrialFunctions(self._W)
+        w, sigma, q = TestFunctions(self._W)
+
+        n = FacetNormal(self._mesh)
+        a_hdiv_projection = (
+            inner(u, sigma) * dx
+            + 2 * avg(inner(u, n) * q) * dS
+            + inner(u, n) * q * ds
+            + inner(gamma, w) * dx
+            + 2 * avg(omega * inner(n, w)) * dS
+            + omega * inner(n, w) * ds
+        )
+        self._Q = Function(V_DG)
+        b_hdiv_projection = (
+            inner(self._Q, sigma) * dx + 2 * avg(inner(self._Q, n) * q) * dS
+        )
+        self._projected_state = Function(self._W)
+        problem_hdiv_projection = LinearVariationalProblem(
+            a_hdiv_projection, b_hdiv_projection, self._projected_state
+        )
+        solver_parameters = {"ksp_type": "gmres", "pc_type": "jacobi"}
+        self._solver_hdiv_projection = LinearVariationalSolver(
+            problem_hdiv_projection, solver_parameters=solver_parameters
+        )
 
     @property
     def label(self):
@@ -84,23 +108,9 @@ class IncompressibleEuler(ABC):
 
         :arg Q: velocity to project
         """
-        u, gamma, omega = TrialFunctions(self._W)
-        w, sigma, q = TestFunctions(self._W)
-
-        n = FacetNormal(self._mesh)
-        a_hdiv_projection = (
-            inner(u, sigma) * dx
-            + 2 * avg(inner(u, n) * q) * dS
-            + inner(u, n) * q * ds
-            + inner(gamma, w) * dx
-            + 2 * avg(omega * inner(n, w)) * dS
-            + omega * inner(n, w) * ds
-        )
-
-        b_hdiv_projection = inner(Q, sigma) * dx + 2 * avg(inner(Q, n) * q) * dS
-        projected_state = Function(self._W)
-        solve(a_hdiv_projection == b_hdiv_projection, projected_state)
-        return projected_state.subfunctions[0]
+        self._Q.assign(Q)
+        self._solver_hdiv_projection.solve()
+        return self._projected_state.subfunctions[0]
 
     @abstractmethod
     def solve(self, Q_initial, p_initial, f_rhs, T_final):
