@@ -197,6 +197,7 @@ if __name__ == "__main__":
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
     print(f"forcing = {args.forcing}")
+    print(f"kappa = {kappa}")
     print(f"use projection method = {args.use_projection_method}")
     print(f"timestepping method = {timestepper.label}")
     print()
