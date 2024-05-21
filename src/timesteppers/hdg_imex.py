@@ -6,6 +6,7 @@ import tqdm
 
 from firedrake import *
 from timesteppers.common import *
+from auxilliary.utils import Averager
 from auxilliary.logging import PerformanceLog
 
 __all__ = [
