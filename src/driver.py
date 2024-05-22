@@ -99,6 +99,13 @@ if __name__ == "__main__":
         help="carry out a single solve with the pressure solver for testing",
     )
 
+    parser.add_argument(
+        "--warmup",
+        action="store_true",
+        default=False,
+        help="only perform one timestep",
+    )
+
     args = parser.parse_args()
 
     # final time
@@ -196,6 +203,7 @@ if __name__ == "__main__":
     print(f"timestep size = {dt}")
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
+    print(f"number of richardson iterations = {timestepper.n_richardson}")
     print(f"forcing = {args.forcing}")
     print(f"kappa = {kappa}")
     print(f"use projection method = {args.use_projection_method}")
@@ -239,53 +247,58 @@ if __name__ == "__main__":
         print(f"    number of iterations = {its}")
         sys.exit()
 
-    Q, p = timestepper.solve(Q_stationary, p_stationary, f_rhs, t_final)
+    if args.warmup:
+        print("WARNING: performing a single timestep only!")
+        print()
 
-    V_Q = timestepper._V_Q
-    V_p = timestepper._V_p
-
-    Q.rename("velocity")
-    p.rename("pressure")
-
-    if args.forcing == "exponential":
-        Q_exact = assemble(
-            exp(-kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
-        )
-        p_exact = assemble(
-            exp(-2 * kappa * t_final) * Function(V_p).interpolate(p_stationary)
-        )
-    elif args.forcing == "constant":
-        Q_exact = assemble(
-            (1.0 - kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
-        )
-        p_exact = assemble(
-            (1 - kappa * t_final) ** 2 * Function(V_p).interpolate(p_stationary)
-        )
-    p_exact -= assemble(p_exact * dx)
-    Q_exact.rename("velocity_exact")
-    p_exact.rename("pressure_exact")
-
-    Q_error = assemble(Q - Q_exact)
-    Q_error.rename("velocity_error")
-    p_error = assemble(p - p_exact)
-    p_error.rename("pressure_error")
-
-    Q_error_nrm = np.sqrt(assemble(inner(Q_error, Q_error) * dx))
-    p_error_nrm = np.sqrt(assemble((p_error) ** 2 * dx))
-    print()
-    print(f"velocity error = {Q_error_nrm}")
-    print(f"pressure error = {p_error_nrm}")
-    print()
-
-    divQ = Function(V_p, name="divergence")
-    phi = TrialFunction(V_p)
-    psi = TestFunction(V_p)
-
-    a_mass = phi * psi * dx
-    b_hdiv_projection = div(Q) * psi * dx
-    solve(a_mass == b_hdiv_projection, divQ)
-
-    outfile = VTKFile("solution.pvd")
-    outfile.write(Q, Q_exact, Q_error, p, p_exact, p_error, divQ)
+    Q, p = timestepper.solve(Q_stationary, p_stationary, f_rhs, t_final, args.warmup)
 
     log_summary()
+
+    if not args.warmup:
+        V_Q = timestepper._V_Q
+        V_p = timestepper._V_p
+
+        Q.rename("velocity")
+        p.rename("pressure")
+
+        if args.forcing == "exponential":
+            Q_exact = assemble(
+                exp(-kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
+            )
+            p_exact = assemble(
+                exp(-2 * kappa * t_final) * Function(V_p).interpolate(p_stationary)
+            )
+        elif args.forcing == "constant":
+            Q_exact = assemble(
+                (1.0 - kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
+            )
+            p_exact = assemble(
+                (1 - kappa * t_final) ** 2 * Function(V_p).interpolate(p_stationary)
+            )
+        p_exact -= assemble(p_exact * dx)
+        Q_exact.rename("velocity_exact")
+        p_exact.rename("pressure_exact")
+
+        Q_error = assemble(Q - Q_exact)
+        Q_error.rename("velocity_error")
+        p_error = assemble(p - p_exact)
+        p_error.rename("pressure_error")
+
+        Q_error_nrm = np.sqrt(assemble(inner(Q_error, Q_error) * dx))
+        p_error_nrm = np.sqrt(assemble((p_error) ** 2 * dx))
+        print()
+        print(f"velocity error = {Q_error_nrm}")
+        print(f"pressure error = {p_error_nrm}")
+        print()
+
+        divQ = Function(V_p, name="divergence")
+        phi = TrialFunction(V_p)
+        psi = TestFunction(V_p)
+
+        a_mass = phi * psi * dx
+        b_hdiv_projection = div(Q) * psi * dx
+        solve(a_mass == b_hdiv_projection, divQ)
+
+        outfile = VTKFile("solution.pvd")
+        outfile.write(Q, Q_exact, Q_error, p, p_exact, p_error, divQ)

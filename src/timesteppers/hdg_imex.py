@@ -46,8 +46,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.alpha_penalty = 1
         # stabilisation parameter
         self.tau = 1
-        # number pf Richardson iterations
-        self._n_richardson = 2
+        # number of Richardson iterations
+        self.n_richardson = 2
 
         # function spaces for velocity, pressure and trace variables
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
@@ -449,7 +449,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         a_mass_inv_mat = a_mass_inv.M.handle
         return a_mass_inv_mat.matMult(a_proj_mat)
 
-    def solve(self, Q_initial, p_initial, f_rhs, T_final):
+    def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 
         The solution is computed to the final time to T_final with nt timesteps; returns
@@ -459,8 +459,9 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         :arg p_initial: initial pressure, provided as an expression
         :arg f_rhs: function which returns an expression for a given time
         :arg T_final: final time
+        :arg warmup: only perform a single timestep
         """
-        nt = int(T_final / self._dt)  # number of timesteps
+        nt = 1 if warmup else int(T_final / self._dt)  # number of timesteps
         assert nt * self._dt - T_final < 1.0e-12  # check that dt divides the final time
         Q_0 = Function(self._V_Q).interpolate(Q_initial)
         p_0 = Function(self._V_p).interpolate(p_initial)
@@ -493,7 +494,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         )
                     if self.use_projection_method:
                         # Richardson iteration
-                        for _ in range(self._n_richardson):
+                        for _ in range(self.n_richardson):
                             # Compute residual
                             its = self.tentative_velocity_solve(f"stage_{i:d}")
                             self.niter_tentative.update(its)
