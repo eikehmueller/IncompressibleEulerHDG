@@ -59,8 +59,11 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self._stage_state = []
         # BDM projected velocity Q*_i for stage i=0,1,...,s-2
         self._Qstar = []
+        # RHS evaluated at intermediate stages
+        self._b_rhs = []
         for k in range(self.nstages):
             self._stage_state.append(Function(self._V))
+            self._b_rhs.append(Function(self._V_Q))
             if k < self.nstages - 1:
                 self._Qstar.append(Function(self._V_Q))
 
@@ -153,13 +156,11 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             - psi * inner(n, Q) * ds
         )
 
-    def _residual(self, w, f_rhs, i, tn):
+    def _residual(self, w, i):
         """Compute residual r_i(w) at stage i
 
         :arg w: velocity test function
-        :arg f_rhs: function which returns a function for a given time
         :arg i: stage index, must be in range 1,2,...,s-1
-        :arg tn: time at beginning of timestep
         """
         assert (0 < i) and (i < self.nstages)
         Q_n, _, __ = split(self._stage_state[0])
@@ -169,29 +170,22 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             if self._a_impl[i, j] != 0:
                 Q_j, _, __ = split(self._stage_state[j])
                 r_form += Constant(self._a_impl[i, j] / self._a_impl[j, j]) * (
-                    inner(Q_j, w) * dx - self._residual(w, f_rhs, j, tn)
+                    inner(Q_j, w) * dx - self._residual(w, j)
                 )
         # explicit contributions
         for j in range(i):
-            if (f_rhs != 0) and (self._a_expl[i, j] != 0):
+            if self._a_expl[i, j] != 0:
                 r_form += (
                     Constant(self._dt * self._a_expl[i, j])
-                    * inner(
-                        w,
-                        Function(self._V_Q).interpolate(
-                            f_rhs(Constant(tn + self._c_expl[j] * self._dt))
-                        ),
-                    )
+                    * inner(w, self._b_rhs[j])
                     * dx
                 )
         return r_form
 
-    def _final_residual(self, w, f_rhs, tn):
+    def _final_residual(self, w):
         """Compute final residual r^{n+1} in each timestep
 
         :arg w: velocity test function
-        :arg f_rhs: function which returns a function for a given time
-        :arg tn: time at beginning of timestep
         """
         Q_n, _, __ = split(self._stage_state[0])
         r_form = inner(Q_n, w) * dx
@@ -200,20 +194,13 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             if self._b_impl[i] != 0:
                 Q_i, _, __ = split(self._stage_state[i])
                 r_form += Constant(self._b_impl[i] / self._a_impl[i, i]) * (
-                    inner(Q_i, w) * dx - self._residual(w, f_rhs, i, tn)
+                    inner(Q_i, w) * dx - self._residual(w, i)
                 )
         # explicit contributions
         for i in range(self.nstages):
-            if (f_rhs != 0) and (self._b_expl[i] != 0):
+            if self._b_expl[i] != 0:
                 r_form += (
-                    Constant(self._dt * self._b_expl[i])
-                    * inner(
-                        w,
-                        Function(self._V_Q).interpolate(
-                            f_rhs(Constant(tn + self._c_expl[i] * self._dt))
-                        ),
-                    )
-                    * dx
+                    Constant(self._dt * self._b_expl[i]) * inner(w, self._b_rhs[i]) * dx
                 )
         return r_form
 
@@ -408,8 +395,13 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         # loop over all timesteps
         for n in tqdm.tqdm(range(nt)):
             with PerformanceLog("timestep"):
-                self._stage_state[0].assign(current_state)
+                # evaluate RHS at intermediate stages
                 tn = n * self._dt  # current time
+                for i in range(self.nstages):
+                    self._b_rhs[i].interpolate(
+                        f_rhs(Constant(tn + self._c_expl[i] * self._dt))
+                    )
+                self._stage_state[0].assign(current_state)
                 # loop over stages 1,2,...,s-1
                 for i in range(1, self.nstages):
                     # compute Q*_{i-1}
@@ -418,7 +410,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             self.project_bdm(self._stage_state[i - 1].subfunctions[0])
                         )
                     if self.use_projection_method:
-                        rhs_i = self._residual(w_Q, f_rhs, i, tn)
+                        rhs_i = self._residual(w_Q, i)
                         Q_i.assign(self._stage_state[i].subfunctions[0])
                         p_i.assign(self._stage_state[i].subfunctions[1])
                         lambda_i.assign(self._stage_state[i].subfunctions[2])
@@ -490,7 +482,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                                 + self._Gamma(psi, mu, u, phi, lmbda)
                             )
                             solve(
-                                a_implicit == self._residual(w, f_rhs, i, tn),
+                                a_implicit == self._residual(w, i),
                                 self._stage_state[i],
                                 solver_parameters={
                                     "ksp_type": "gmres",
@@ -500,9 +492,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                                 nullspace=self.nullspace,
                             )
                     self._shift_pressure(self._stage_state[i])
-                its = self.pressure_solve(
-                    current_state, self._final_residual(w, f_rhs, tn)
-                )
+                its = self.pressure_solve(current_state, self._final_residual(w))
                 self.niter_final_pressure.update(its)
 
                 # Reconstruct pressure from velocity
