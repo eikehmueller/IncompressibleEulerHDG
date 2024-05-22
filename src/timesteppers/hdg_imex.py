@@ -203,6 +203,39 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             )
         )
 
+        # tentative velocity solve
+        solver_parameters = {
+            "ksp_type": "gmres",
+            "pc_type": "ilu",
+        }
+        u_Q = TrialFunction(self._V_Q)
+        w_Q = TestFunction(self._V_Q)
+        self._solver_tentative_velocity = dict()
+        for i in range(1, self.nstages):
+            a_tentative = inner(u_Q, w_Q) * dx - Constant(
+                self._a_impl[i, i] * self._dt
+            ) * self._f_impl(w_Q, u_Q, self._Qstar[i - 1])
+            Q_i = self._stage_state[i].subfunctions[0]
+            p_i = self._stage_state[i].subfunctions[1]
+            lambda_i = self._stage_state[i].subfunctions[2]
+            b_rhs_tentative = (
+                self._residual(w_Q, i)
+                - inner(w_Q, Q_i) * dx
+                + Constant(self._a_impl[i, i] * self._dt)
+                * (
+                    self._f_impl(w_Q, Q_i, self._Qstar[i - 1])
+                    + self._pressure_gradient(w_Q, p_i, lambda_i)
+                )
+            )
+            problem_tentative = LinearVariationalProblem(
+                a_tentative, b_rhs_tentative, self._Q_tentative[i]
+            )
+
+            self._solver_tentative_velocity[f"stage_{i:d}"] = LinearVariationalSolver(
+                problem_tentative,
+                solver_parameters=solver_parameters,
+            )
+
     @PerformanceLog("pressure_solve")
     def pressure_solve(self, key):
         """Solve pressure correction equation
@@ -219,6 +252,15 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             .condensed_ksp.getIterationNumber()
         )
         return its
+
+    @PerformanceLog("tentative_velocity_solve")
+    def tentative_velocity_solve(self, key):
+        """Compute tentative velocity
+
+        :arg key: the particular solve to perform; needs to be of the form "stage_i",
+        """
+        self._solver_tentative_velocity[key].solve()
+        return self._solver_tentative_velocity[key].snes.getKSP().getIterationNumber()
 
     @property
     @abstractmethod
@@ -423,14 +465,9 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         Q_0 = Function(self._V_Q).interpolate(Q_initial)
         p_0 = Function(self._V_p).interpolate(p_initial)
         p_0 -= assemble(p_0 * dx)
-        Q_i = Function(self._V_Q)
-        p_i = Function(self._V_p)
-        lambda_i = Function(self._V_trace)
         self._current_state.subfunctions[0].assign(Q_0)
         self._current_state.subfunctions[1].assign(p_0)
         self._reconstruct_trace(self._current_state)
-        u_Q = TrialFunction(self._V_Q)
-        w_Q = TestFunction(self._V_Q)
         u, phi, lmbda = TrialFunctions(self._V)
         w, psi, mu = TestFunctions(self._V)
         self.niter_tentative.reset()
@@ -455,64 +492,37 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             self.project_bdm(self._stage_state[i - 1].subfunctions[0])
                         )
                     if self.use_projection_method:
-                        rhs_i = self._residual(w_Q, i)
-                        Q_i.assign(self._stage_state[i].subfunctions[0])
-                        p_i.assign(self._stage_state[i].subfunctions[1])
-                        lambda_i.assign(self._stage_state[i].subfunctions[2])
                         # Richardson iteration
                         for _ in range(self._n_richardson):
                             # Compute residual
-                            b_rhs_tentative = (
-                                rhs_i
-                                - inner(w_Q, Q_i) * dx
-                                + Constant(self._a_impl[i, i] * self._dt)
-                                * (
-                                    self._f_impl(w_Q, Q_i, self._Qstar[i - 1])
-                                    + self._pressure_gradient(w_Q, p_i, lambda_i)
-                                )
-                            )
-                            # step 1: compute tentative velocity
-                            with PerformanceLog("tentative_velocity_solve"):
-                                a_tentative = inner(u_Q, w_Q) * dx - Constant(
-                                    self._a_impl[i, i] * self._dt
-                                ) * self._f_impl(w_Q, u_Q, self._Qstar[i - 1])
-                                problem_tentative = LinearVariationalProblem(
-                                    a_tentative, b_rhs_tentative, self._Q_tentative[i]
-                                )
-                                solver_parameters = {
-                                    "ksp_type": "gmres",
-                                    "pc_type": "ilu",
-                                }
-                                solver_tentative = LinearVariationalSolver(
-                                    problem_tentative,
-                                    solver_parameters=solver_parameters,
-                                )
-
-                                solver_tentative.solve()
-                            self.niter_tentative.update(
-                                solver_tentative.snes.getKSP().getIterationNumber()
-                            )
+                            its = self.tentative_velocity_solve(f"stage_{i:d}")
+                            self.niter_tentative.update(its)
                             # step 2: compute (hybridised) pressure and velocity increment
                             its = self.pressure_solve(f"stage_{i:d}")
                             # The solution of the mixed problem is stored in self._update
                             self.niter_pressure.update(its)
                             # step 3: update velocity at current stage
                             self._shift_pressure(self._update)
-                            Q_i.assign(
+                            self._stage_state[i].subfunctions[0].assign(
                                 assemble(
-                                    Q_i
+                                    self._stage_state[i].subfunctions[0]
                                     + self._Q_tentative[i]
                                     + Constant(self._a_impl[i, i] * self._dt)
                                     * self._update.subfunctions[0]
                                 )
                             )
-                            p_i.assign(assemble(p_i + self._update.subfunctions[1]))
-                            lambda_i.assign(
-                                assemble(lambda_i + self._update.subfunctions[2])
+                            self._stage_state[i].subfunctions[1].assign(
+                                assemble(
+                                    self._stage_state[i].subfunctions[1]
+                                    + self._update.subfunctions[1]
+                                )
                             )
-                        self._stage_state[i].subfunctions[0].assign(Q_i)
-                        self._stage_state[i].subfunctions[1].assign(p_i)
-                        self._stage_state[i].subfunctions[2].assign(lambda_i)
+                            self._stage_state[i].subfunctions[2].assign(
+                                assemble(
+                                    self._stage_state[i].subfunctions[2]
+                                    + self._update.subfunctions[2]
+                                )
+                            )
                     else:
                         with PerformanceLog("unsplit_solve"):
                             a_implicit = (
