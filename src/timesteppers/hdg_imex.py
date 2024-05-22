@@ -494,6 +494,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             )
                             # step 2: compute (hybridised) pressure and velocity increment
                             its = self.pressure_solve(f"stage_{i:d}")
+                            # The solution of the mixed problem is stored in self._update
                             self.niter_pressure.update(its)
                             # step 3: update velocity at current stage
                             self._shift_pressure(self._update)
@@ -535,11 +536,13 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             )
                     self._shift_pressure(self._stage_state[i])
                 its = self.pressure_solve("final_stage")
+                # The solution of the mixed problem is stored in self._current_state
                 self.niter_final_pressure.update(its)
 
                 # Reconstruct pressure from velocity
                 self._b_new.interpolate(f_rhs(Constant(tn + self._dt)))
                 its = self.pressure_solve("pressure_reconstruction")
+                # The solution of the mixed problem is stored in self._pressure_reconstruction
                 self.niter_pressure_reconstruction.update(its)
                 for idx in (1, 2):
                     self._current_state.subfunctions[idx].assign(
