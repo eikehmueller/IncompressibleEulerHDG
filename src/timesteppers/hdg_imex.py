@@ -550,18 +550,16 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     )
                 self._shift_pressure(self._current_state)
         print()
-        print(
-            f"average number of tentative velocity solver iterations      : {self.niter_tentative.value:8.2f}"
-        )
+        print("average number of solver iterations")
+        print(40 * "-")
+        print(f"  tentative velocity its      : {self.niter_tentative.value:8.2f}")
         if self.use_projection_method:
+            print(f"  pressure its                : {self.niter_pressure.value:8.2f}")
             print(
-                f"average number of pressure solver iterations                : {self.niter_pressure.value:8.2f}"
-            )
-            print(
-                f"average number of final pressure solver iterations          : {self.niter_final_pressure.value:8.2f}"
+                f"  final pressure its          : {self.niter_final_pressure.value:8.2f}"
             )
         print(
-            f"average number of pressure reconstruction solver iterations : {self.niter_pressure_reconstruction.value:8.2f}"
+            f"  pressure reconstruction its : {self.niter_pressure_reconstruction.value:8.2f}"
         )
         return self._current_state.subfunctions[0], self._current_state.subfunctions[1]
 
