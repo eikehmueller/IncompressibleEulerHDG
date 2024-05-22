@@ -641,8 +641,6 @@ class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
         super().__init__(
             mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS2(2,3,2)"
         )
-        self.gamma = 1 - 1 / np.sqrt(2)
-        self.delta = -2 / 3 * np.sqrt(2)
 
     @property
     def nstages(self):
@@ -651,31 +649,33 @@ class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
     @property
     def _a_expl(self):
         """3 x 3 matrix with explicit coefficients for intermediate stages"""
-        return np.asarray(
-            [[0, 0, 0], [self.gamma, 0, 0], [self.delta, 1 - self.delta, 0]]
-        )
+        gamma = 1 - 1 / np.sqrt(2)
+        delta = -2 / 3 * np.sqrt(2)
+        return np.asarray([[0, 0, 0], [gamma, 0, 0], [delta, 1 - delta, 0]])
 
     @property
     def _a_impl(self):
         """3 x 3 matrix with implicit coefficients for intermediate stages"""
-        return np.asarray(
-            [[0, 0, 0], [0, self.gamma, 0], [0, 1 - self.gamma, self.gamma]]
-        )
+        gamma = 1 - 1 / np.sqrt(2)
+        return np.asarray([[0, 0, 0], [0, gamma, 0], [0, 1 - gamma, gamma]])
 
     @property
     def _b_expl(self):
         """vector of length 3 with explicit coefficients for final stage"""
-        return np.asarray([0, 1 - self.gamma, self.gamma])
+        gamma = 1 - 1 / np.sqrt(2)
+        return np.asarray([0, 1 - gamma, gamma])
 
     @property
     def _b_impl(self):
         """vector of length 3 with implicit coefficients for final stage"""
-        return np.asarray([0, 1 - self.gamma, self.gamma])
+        gamma = 1 - 1 / np.sqrt(2)
+        return np.asarray([0, 1 - gamma, gamma])
 
     @property
     def _c_expl(self):
         """vector of length 3 with fractional times at which explicit term is evaluated"""
-        return np.asarray([0, self.gamma, 1])
+        gamma = 1 - 1 / np.sqrt(2)
+        return np.asarray([0, gamma, 1])
 
 
 class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
@@ -812,10 +812,6 @@ class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
         super().__init__(
             mesh, degree, dt, flux, use_projection_method, label="HDG IMEX SSP3(4,3,3)"
         )
-        self._alpha = 0.2416942608
-        self._beta = 0.0604235652
-        self._eta = 0.1291528696
-        self._delta = 1 / 2 - self._alpha - self._beta - self._eta
 
     @property
     def nstages(self):
@@ -836,12 +832,16 @@ class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
     @property
     def _a_impl(self):
         """4 x 4 matrix with implicit coefficients for intermediate stages"""
+        alpha = 0.2416942608
+        beta = 0.0604235652
+        eta = 0.1291528696
+        delta = 1 / 2 - alpha - beta - eta
         return np.asarray(
             [
-                [self._alpha, 0, 0, 0],
-                [-self._alpha, self._alpha, 0, 0],
-                [0, 1 - self._alpha, self._alpha, 0],
-                [self._beta, self._eta, self._delta, self._alpha],
+                [alpha, 0, 0, 0],
+                [-alpha, alpha, 0, 0],
+                [0, 1 - alpha, alpha, 0],
+                [beta, eta, delta, alpha],
             ]
         )
 
