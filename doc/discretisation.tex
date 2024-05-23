@@ -603,43 +603,45 @@ For reference the Butcher tableaus for the timestepping method that are used for
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Experimental setup}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-To test the IMEX timestepping methods described in Section \ref{sec:imex}, we solve the problem with an exact solution written down in Appendix \ref{sec:exact_solution}. Setting $\Psi(t)=e^{-\kappa t}$ the initial condition $Q_0$ and forcing function $f$ that define Eq. \eqref{eqn:incompressible_euler} are then given according to Eq. \eqref{eqn:forcing_exact} as
+To test the IMEX timestepping methods described in Section \ref{sec:imex} we solve the
+incompressible Euler equations in Eq. \eqref{eqn:incompressible_euler} with initial conditions and forcing function chosen such that in the continuum $Q(x,y,t)$ and $p(x,y,t)$ are given by the exact solution written down in Appendix \ref{sec:exact_solution}. Setting $\Psi(t)=e^{-\kappa t}$, the initial condition $Q_0$ and forcing function $f$ can be read off from Eq. \eqref{eqn:forcing_exact} as
 \begin{xalignat}{2}
     Q_0(x,y) &= \begin{pmatrix}-\cos\left(\frac{2x-1}{2}\pi\right)\sin\left(\frac{2y-1}{2}\pi\right) \\
-        \sin\left(\frac{2x-1}{2}\pi\right)\cos\left(\frac{2y-1}{2}\pi\right)\end{pmatrix};&
-    f(x,y,t) &= -\kappa e^{-\kappa t} Q_0(x,y)
+        \sin\left(\frac{2x-1}{2}\pi\right)\cos\left(\frac{2y-1}{2}\pi\right)\end{pmatrix},&
+    f(x,y,t) &= -\kappa e^{-\kappa t} Q_0(x,y).
 \end{xalignat}
-we set $\kappa=0.5$ in all numerical experiments. The final time is fixed at $T=1$.
+We set $\kappa=0.5$ in all numerical experiments and fix the final time to $T=1$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \paragraph{Timestepping methods.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 We pick timesteppers such that the order of the method is the same as the polynomial degree $k$ used to discretise the pressure field; in this case we would expect that the temporal and spatial order of convergence are the same. The following three setups are considered here:
 \begin{enumerate}
-    \item The two-stage implicit Euler method with $k=1$
-    \item The three-stage SSP2(3,3,2) method with $k=2$
-    \item The four-stage SSP3(4,3,3) method with $k=3$
+    \item The two-stage implicit Euler method (see Tab. \ref{tab:butcher_tableau_imex_euler}) with $k=1$
+    \item The three-stage SSP2(3,3,2) method (see Tab. \ref{tab:butcher_tableau_ssp2_332}) with $k=2$
+    \item The four-stage SSP3(4,3,3) method (see Tab. \ref{tab:butcher_tableau_ssp3_433}) with $k=3$
 \end{enumerate}
-Recall that according to Eq. \eqref{eqn:function_spaces} the components of the velocity field are represented by polynomials of degree $k+1$. Numerical experiments are carried out on grids of size $n\times n$. Since the cells are right-angles triangles with two sides of length $h=1/n$, each grid contains $2n^2$ cells; we will refer to $n$ as the ``grid size'' in the following. The number of timesteps is set to $n_t=n$ which results in a timestep size of $\Delta t=h$.
+Recall that according to Eq. \eqref{eqn:function_spaces} the components of the velocity field are represented by polynomials of degree $k+1$. Numerical experiments are carried out on grids of size $n\times n$. Since the cells are right-angled triangles with two sides of length $h=1/n$ and one side of length $\sqrt{2}h$, each grid contains $2n^2$ cells; we will refer to $n$ as the ``grid size'' in the following. The number of timesteps is set to $n_t=n$ which results in a timestep size of $\Delta t=h$.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \paragraph{Solvers and preconditioners.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-To compute the tentative velocity (see Eq. \eqref{eqn:tentative_velocity}) we use a GMRES solver with ILU0 preconditioner. The $L_2$ projection $\mathcal{P}:Q\rightarrow Q^\star$ of the velocity $Q$ to the H-Div $\text{BDM}_{k+1}^0$ subspace is done with a GMRES solver preconditioned with Jacobi. To solve the mixed problem in Eqs. \eqref{eqn:final_update}, \eqref{eqn:pressure_increment} and \eqref{eqn:pressure_reconstruction_compact} we first use a Schur-complement reduction method to reduce the problem to an equation for the facet variables $\lambda$; in Firedrake this is realised with the static condensation preconditioner class \texttt{firedrake.SCPC}. The resulting system is then solved with a GMRES iteration, preconditioned with the non-nested multigrid method described in \cite{Cockburn2014} (class \texttt{firedrake.GTMGPC}). On the finest level, a Chebyshev smoother based on the block-diagonal is used such that the matrix which couples the unknowns on each facet is inverted exactly; this is achieved with \texttt{firedrake.ASMStarPC}. For simplicity, the coarse level problem is solved with a standard AMG method with Chebyshev smoothers. Two pre- and post-smoothing iterations are used on all levels. In the non-nested multigrid algorithm the coarse level space consists of piecewise linear conforming elements, i.e. it is formulated in the space
+To compute the tentative velocity (see Eq. \eqref{eqn:tentative_velocity}) we use a GMRES solver with ILU0 preconditioner. The $L_2$ projection $\mathcal{P}:Q\rightarrow Q^\star$ of the velocity $Q$ to the H-Div $\text{BDM}_{k+1}^0$ subspace is performed with a GMRES solver preconditioned with a simple Jacobi iteration. To solve the mixed problem in Eqs. \eqref{eqn:final_update}, \eqref{eqn:pressure_increment} and \eqref{eqn:pressure_reconstruction_compact} we first use a Schur-complement reduction method to reduce the problem to an equation for the facet variables $\lambda$; in Firedrake this is realised with the static condensation preconditioner class \texttt{firedrake.SCPC}. The resulting system is then solved with a GMRES iteration, preconditioned with the non-nested multigrid method described in \cite{Cockburn2014} (class \texttt{firedrake.GTMGPC}). On the finest level, a Chebyshev smoother based on the block-diagonal is used such that the matrix which couples the unknowns on each facet is inverted exactly; this is achieved with \texttt{firedrake.ASMStarPC}. For simplicity, the coarse level problem is solved with a standard AMG method with Chebyshev smoothers. Two pre- and post-smoothing iterations are used on all levels. In the non-nested multigrid algorithm the coarse level space consists of piecewise linear conforming elements on the original mesh, i.e. it is formulated in the space
 \begin{equation}
     V_{c} = \text{P}_1 := \{ v\in C(\Omega) : v|_K \in P_1(K) \;\text{for all}\;K\in \Omega_h \}.
 \end{equation}
-The weak form on the coarse level is
+The weak form on the coarse level is obtained by re-discretisation of the Laplace operator
 \begin{equation}
     a_{c}(\phi_c,\psi_c) = -(\nabla \psi_c \cdot \nabla \phi_c)_{\Omega_h}\qquad\text{for all $\phi_c,\psi_c\in V_{c}$}
 \end{equation}
-and the prolongation $\mathscr{P}:V_c\rightarrow V_{\text{trace}}$ is defined by
+and the prolongation $\mathscr{P}:V_c\rightarrow V_{\text{trace}}$ is given by the injection on the skeleton $\mathcal{E}_h$
 \begin{xalignat}{2}
     \mathscr{P}&: \phi_c \mapsto \phi, &
     \langle \mu \phi_c \rangle_{\mathcal{E}_h} & =\langle \mu \phi \rangle_{\mathcal{E}_h} \qquad\text{for all $\mu\in V_{\text{trace}}$}.
 \end{xalignat}
+As will be demonstrated below (see Fig. \ref{fig:niter}), this non-nested multigrid algorithm is $h-$ and $p-$ robust.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Error}
+\subsection{Convergence}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-We start by verifying that the numerical solution converges to the exact solution given in Eqs. \eqref{eqn:exact_solution}. Fig. \ref{fig:spatial_error} shows the spatial distribution of the error on a $16\times 16$ grid with a SSP2(3,3,2) timestepper and $k=2$. As the figure shows, the error is distributed approximately uniformly across the domain.
+We start by verifying that the numerical solution converges to the exact solution given in Eqs. \eqref{eqn:exact_solution}. To illustrate that errors are uniformly distributed across the domain, Fig. \ref{fig:spatial_error} shows the spatial distribution of the error on a $16\times 16$ grid with a SSP2(3,3,2) timestepper and $k=2$.
 \begin{figure}
     \begin{center}
         \includegraphics[width=1.0\linewidth]{figures/error_spatial.png}
@@ -647,7 +649,7 @@ We start by verifying that the numerical solution converges to the exact solutio
         \label{fig:spatial_error}
     \end{center}
 \end{figure}
-Next, Fig. \ref{fig:L2error} shows how the error in the $L_2$ depends on the grid size for different polynomial degrees. For both velocity and pressure we observe convergence with the asymptotic rate  $\propto h^{k}\propto (\Delta t)^k$.
+To quantify convergence with this grid spacing $h$ we compute the $L_2$ error norm for increasing resolution. Fig. \ref{fig:L2error} shows how the error in the $L_2$ norm depends on the grid size for different polynomial degrees. For both velocity and pressure we observe convergence with the asymptotic rate  $\propto h^{k}\propto (\Delta t)^k$.
 \begin{figure}
     \begin{center}
         \includegraphics[width=0.75\linewidth]{figures/L2error.pdf}
@@ -658,7 +660,11 @@ Next, Fig. \ref{fig:L2error} shows how the error in the $L_2$ depends on the gri
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Performance}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Next, we investigate the performance of the methods. Recall that an $s$-stage method with $n_R$ Richardson iterations requires $s-1$ projections of the velocity to the $\text{BDM}_{k+1}^0$ space, $n_R(s-1)$ solves for the tentative velocity and $n_R(s-1)+2$ pressure solves. We expect these operations to dominate the total cost and this is confirmed by Fig. \ref{fig:titer_breakdown} which shows a breakdown of the runtime.
+Next, we investigate the performance of the different time integrators. For this, we first identify the computational bottlenecks.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Breakdown of time per iteration.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Recall that an $s$-stage method with $n_R$ Richardson iterations requires $s-1$ projections of the velocity to the $\text{BDM}_{k+1}^0$ space, $n_R(s-1)$ solves for the tentative velocity and $n_R(s-1)+2$ mixed pressure solves. We expect these operations to dominate the total cost and this is confirmed by Fig. \ref{fig:titer_breakdown} which shows a breakdown of the runtime; more detailed results can be found in Tab. \ref{tab:time_per_iteration_breakdown}. Somewhat surprisingly, for higher orders the runtime is dominated by the BDM projection. \hl{Need to look at the BDM projection - we are probably not using the best solver here.}
 \begin{figure}
     \begin{center}
         \includegraphics[width=0.75\linewidth]{figures/titer_breakdown.pdf}
@@ -666,7 +672,17 @@ Next, we investigate the performance of the methods. Recall that an $s$-stage me
         \label{fig:titer_breakdown}
     \end{center}
 \end{figure}
-Since both solves are performed with iterative methods, it is crucial to quantify the number of solver iterations that are required to achieve convergence. Fig. \ref{fig:niter} shows the average number of iterations\footnote{For the pressure solver, we only consider the final pressure solve in each timestep. However, we verified that the other solves require approximately the same number of iterations.} as a function of the grid size both for the tentative velocity solver and the pressure solver. The figure demonstrates that empirically both solvers are robust as the grid size $n$ and polynomial degree $k$ increases. Since (ideally) each solver iteration incurs a cost proportional to the number of unknowns, we therefore expect the cost of a single timestep to be proportial to number of unknowns for a given timestepper and polynomial degree $k$.
+\begin{table}
+    \input{time_per_timestep_breakdown}
+    \begin{center}
+        \caption{Breakdown of the time spent in the solver components for each timestep. For each component, the time per call and the number of calls per timestep is given. The total time per timestep is listed in the final column. Results are shown for the 2-stage implicit Euler method, the 3-stage SSP2(3,3,2) integrator and the 4-stage SSP3(4,3,3) timestepper.}
+        \label{tab:time_per_iteration_breakdown}
+    \end{center}
+\end{table}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Robustness of the solvers.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+In the following we discuss the $h-$ and $p-$ robustness of the pressure- and tentative velocity solves \hl{Include BDM projection in analysis.}. Since both solves are performed with iterative methods, it is crucial to quantify the number of solver iterations that are required to achieve convergence. We manually set at relative tolerance of $10^{-12}$ on the preconditioned residual for the pressure solve and use the PETSc default setting for the tentative velocity solver. Fig. \ref{fig:niter} shows the average number of iterations\footnote{For the pressure solver, we only consider the final pressure solve in each timestep. However, we verified that the other solves require approximately the same number of iterations.} as a function of the grid size both for the tentative velocity solver and the pressure solver. The figure demonstrates that empirically both solvers are robust as the grid size $n$ and polynomial degree $k$ increases. Since (ideally) each solver iteration incurs a cost proportional to the number of unknowns, we therefore expect the cost of a single timestep to be proportial to number of unknowns for a given timestepper and polynomial degree $k$.
 \begin{figure}
     \begin{center}
         \includegraphics[width=0.75\linewidth]{figures/niter.pdf}
@@ -682,6 +698,9 @@ This time per timestep is plotted as a function of the grid size for different p
         \label{fig:titer}
     \end{center}
 \end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\paragraph{Total runtime.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 The most useful metric to quantify the performance of a given setup is the total runtime for a given error. We plot this time as a function of both the $L_2$ velocity error norm and the $L_2$ pressure error norm in Fig. \ref{fig:ttotal}. For a fixed error budget higher order integrator have a significantly smaller overall runtime as the bound on the error decreases.
 \begin{figure}
     \begin{center}

@@ -1,0 +1,56 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{center}
+    implicit Euler, $k=1$\\[1ex]
+    \begin{tabular}{|c|rcrcr|rcrcr|rcrcr|r|}
+        \hline
+        grid                                           &
+        \multicolumn{5}{|c|}{pressure solve}           &
+        \multicolumn{5}{|c|}{tentative velocity solve} &
+        \multicolumn{5}{|c|}{BDM projection}           &
+        timestep                                                                                                                                                       \\
+        \hline\hline
+        $ 4\times 4$                                   & 4 & $\times$ & 0.07 & $=$ & 0.28 & 2 & $\times$ & 0.02 & $=$ & 0.03 & 1 & $\times$ & 0.05 & $=$ & 0.05 & 0.39 \\
+        $ 8\times 8$                                   & 4 & $\times$ & 0.06 & $=$ & 0.26 & 2 & $\times$ & 0.01 & $=$ & 0.02 & 1 & $\times$ & 0.03 & $=$ & 0.03 & 0.33 \\
+        $16\times16$                                   & 4 & $\times$ & 0.17 & $=$ & 0.68 & 2 & $\times$ & 0.02 & $=$ & 0.04 & 1 & $\times$ & 0.03 & $=$ & 0.03 & 0.77 \\
+        $32\times32$                                   & 4 & $\times$ & 1.03 & $=$ & 4.13 & 2 & $\times$ & 0.07 & $=$ & 0.14 & 1 & $\times$ & 0.07 & $=$ & 0.07 & 4.35 \\
+        $48\times48$                                   & 4 & $\times$ & 2.27 & $=$ & 9.10 & 2 & $\times$ & 0.17 & $=$ & 0.34 & 1 & $\times$ & 0.17 & $=$ & 0.17 & 9.63 \\
+        \hline\end{tabular}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{center}
+    SSP2(3,3,2), $k=2$\\[1ex]
+    \begin{tabular}{|c|rcrcr|rcrcr|rcrcr|r|}
+        \hline
+        grid                                           &
+        \multicolumn{5}{|c|}{pressure solve}           &
+        \multicolumn{5}{|c|}{tentative velocity solve} &
+        \multicolumn{5}{|c|}{BDM projection}           &
+        timestep                                                                                                                                                         \\
+        \hline\hline
+        $ 4\times 4$                                   & 6 & $\times$ & 0.07 & $=$ & 0.39  & 4 & $\times$ & 0.01 & $=$ & 0.06 & 2 & $\times$ & 0.04 & $=$ & 0.08 & 0.55  \\
+        $ 8\times 8$                                   & 6 & $\times$ & 0.07 & $=$ & 0.40  & 4 & $\times$ & 0.02 & $=$ & 0.07 & 2 & $\times$ & 0.05 & $=$ & 0.11 & 0.60  \\
+        $16\times16$                                   & 6 & $\times$ & 0.18 & $=$ & 1.10  & 4 & $\times$ & 0.05 & $=$ & 0.21 & 2 & $\times$ & 0.17 & $=$ & 0.34 & 1.67  \\
+        $32\times32$                                   & 6 & $\times$ & 1.10 & $=$ & 6.62  & 4 & $\times$ & 0.25 & $=$ & 0.99 & 2 & $\times$ & 0.73 & $=$ & 1.46 & 9.10  \\
+        $48\times48$                                   & 6 & $\times$ & 2.44 & $=$ & 14.63 & 4 & $\times$ & 0.55 & $=$ & 2.20 & 2 & $\times$ & 1.79 & $=$ & 3.59 & 20.46 \\
+        \hline\end{tabular}
+\end{center}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{center}
+    SSP3(4,3,3), $k=3$\\[1ex]
+    \begin{tabular}{|c|rcrcr|rcrcr|rcrcr|r|}
+        \hline
+        grid                                           &
+        \multicolumn{5}{|c|}{pressure solve}           &
+        \multicolumn{5}{|c|}{tentative velocity solve} &
+        \multicolumn{5}{|c|}{BDM projection}           &
+        timestep                                                                                                                                                           \\
+        \hline\hline
+        $ 4\times 4$                                   & 8 & $\times$ & 0.05 & $=$ & 0.44  & 6 & $\times$ & 0.02 & $=$ & 0.12 & 3 & $\times$ & 0.08  & $=$ & 0.24  & 0.84  \\
+        $ 8\times 8$                                   & 8 & $\times$ & 0.07 & $=$ & 0.56  & 6 & $\times$ & 0.04 & $=$ & 0.23 & 3 & $\times$ & 0.27  & $=$ & 0.82  & 1.65  \\
+        $16\times16$                                   & 8 & $\times$ & 0.20 & $=$ & 1.64  & 6 & $\times$ & 0.15 & $=$ & 0.91 & 3 & $\times$ & 1.04  & $=$ & 3.12  & 5.71  \\
+        $32\times32$                                   & 8 & $\times$ & 1.20 & $=$ & 9.60  & 6 & $\times$ & 0.65 & $=$ & 3.93 & 3 & $\times$ & 4.83  & $=$ & 14.48 & 28.06 \\
+        $48\times48$                                   & 8 & $\times$ & 2.67 & $=$ & 21.33 & 6 & $\times$ & 1.53 & $=$ & 9.17 & 3 & $\times$ & 11.43 & $=$ & 34.30 & 64.86 \\
+        \hline\end{tabular}
+\end{center}
