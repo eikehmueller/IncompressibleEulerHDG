@@ -623,7 +623,7 @@ Recall that according to Eq. \eqref{eqn:function_spaces} the components of the v
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \paragraph{Solvers and preconditioners.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-To compute the tentative velocity (see Eq. \eqref{eqn:tentative_velocity}) we use a GMRES solver with ILU0 preconditioner. To solve the mixed problem in Eqs. \eqref{eqn:final_update}, \eqref{eqn:pressure_increment} and \eqref{eqn:pressure_reconstruction_compact} we first use a Schur-complement reduction method to reduce the problem to an equation for the facet variables $\lambda$; in Firedrake this is realised with the static condensation preconditioner class \texttt{firedrake.SCPC}. The resulting system is then solved with a GMRES iteration, preconditioned with the non-nested multigrid method described in \cite{Cockburn2014} (class \texttt{firedrake.GTMGPC}). On the finest level, a Chebyshev smoother based on the block-diagonal is used such that the matrix which couples the unknowns on each facet is inverted exactly; this is achieved with \texttt{firedrake.ASMStarPC}. For simplicity, the coarse level problem is solved with a standard AMG method with Chebyshev smoothers. Two pre- and post-smoothing iterations are used on all levels. In the non-nested multigrid algorithm the coarse level space consists of piecewise linear conforming elements, i.e. it is formulated in the space
+To compute the tentative velocity (see Eq. \eqref{eqn:tentative_velocity}) we use a GMRES solver with ILU0 preconditioner. The $L_2$ projection $\mathcal{P}:Q\rightarrow Q^\star$ of the velocity $Q$ to the H-Div $\text{BDM}_{k+1}^0$ subspace is done with a GMRES solver preconditioned with Jacobi. To solve the mixed problem in Eqs. \eqref{eqn:final_update}, \eqref{eqn:pressure_increment} and \eqref{eqn:pressure_reconstruction_compact} we first use a Schur-complement reduction method to reduce the problem to an equation for the facet variables $\lambda$; in Firedrake this is realised with the static condensation preconditioner class \texttt{firedrake.SCPC}. The resulting system is then solved with a GMRES iteration, preconditioned with the non-nested multigrid method described in \cite{Cockburn2014} (class \texttt{firedrake.GTMGPC}). On the finest level, a Chebyshev smoother based on the block-diagonal is used such that the matrix which couples the unknowns on each facet is inverted exactly; this is achieved with \texttt{firedrake.ASMStarPC}. For simplicity, the coarse level problem is solved with a standard AMG method with Chebyshev smoothers. Two pre- and post-smoothing iterations are used on all levels. In the non-nested multigrid algorithm the coarse level space consists of piecewise linear conforming elements, i.e. it is formulated in the space
 \begin{equation}
     V_{c} = \text{P}_1 := \{ v\in C(\Omega) : v|_K \in P_1(K) \;\text{for all}\;K\in \Omega_h \}.
 \end{equation}
@@ -658,7 +658,15 @@ Next, Fig. \ref{fig:L2error} shows how the error in the $L_2$ depends on the gri
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Performance}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Next, we investigate the performance of the methods. Recall that an $s$-stage method with $n_R$ Richardson iterations requires $(n_R-1)s$ solves for the tentative velocity and $(n_R-2)s+2$ pressure solves and we expect these to dominate the total cost \hl{measure breakdown of runtime to quantify this}. Since both solves are performed with iterative methods, it is crucial to quantify the number of solver iterations that are required to achieve convergence. Fig. \ref{fig:niter} shows the average number of iterations\footnote{For the pressure solver, we only consider the final pressure solve in each timestep. However, we verified that the other solves require approximately the same number of iterations.} as a function of the grid size both for the tentative velocity solver and the pressure solver. The figure demonstrates that empirically both solvers are robust as the grid size $n$ and polynomial degree $k$ increases. Since (ideally) each solver iteration incurs a cost proportional to the number of unknowns, we therefore expect the cost of a single timestep to be proportial to number of unknowns for a given timestepper and polynomial degree $k$.
+Next, we investigate the performance of the methods. Recall that an $s$-stage method with $n_R$ Richardson iterations requires $s-1$ projections of the velocity to the $\text{BDM}_{k+1}^0$ space, $n_R(s-1)$ solves for the tentative velocity and $n_R(s-1)+2$ pressure solves. We expect these operations to dominate the total cost and this is confirmed by Fig. \ref{fig:titer_breakdown} which shows a breakdown of the runtime.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=0.75\linewidth]{figures/titer_breakdown.pdf}
+        \caption{Fraction of runtime spent in the different solver components for varying grid size and different polynomial degrees.}
+        \label{fig:titer_breakdown}
+    \end{center}
+\end{figure}
+Since both solves are performed with iterative methods, it is crucial to quantify the number of solver iterations that are required to achieve convergence. Fig. \ref{fig:niter} shows the average number of iterations\footnote{For the pressure solver, we only consider the final pressure solve in each timestep. However, we verified that the other solves require approximately the same number of iterations.} as a function of the grid size both for the tentative velocity solver and the pressure solver. The figure demonstrates that empirically both solvers are robust as the grid size $n$ and polynomial degree $k$ increases. Since (ideally) each solver iteration incurs a cost proportional to the number of unknowns, we therefore expect the cost of a single timestep to be proportial to number of unknowns for a given timestepper and polynomial degree $k$.
 \begin{figure}
     \begin{center}
         \includegraphics[width=0.75\linewidth]{figures/niter.pdf}
@@ -666,10 +674,10 @@ Next, we investigate the performance of the methods. Recall that an $s$-stage me
         \label{fig:niter}
     \end{center}
 \end{figure}
-This time per timestep is plotted as a function of the grid size for different polynomial degrees in Fig. \ref{fig:titer}. Naturally, this cost increases for higher polynomial degrees $k$. For fixed $k$ it appears to grow slightly faster than the number of unknowns. This might be due to the fact that the cost of a single solver iteration grows faster \hl{Maybe this is due to the AMG solver? Need to look at more detailed breakdown of runtime.}.
+This time per timestep is plotted as a function of the grid size for different polynomial degrees in Fig. \ref{fig:titer}. Naturally, this cost increases for higher polynomial degrees $k$. Asymptotically, for fixed $k$ the time per timestep grows in proportion to the number of unknowns, which is proportional to $n^2\propto h^{-2}$.
 \begin{figure}
     \begin{center}
-        \includegraphics[width=0.75\linewidth]{figures/titer.pdf}
+        \includegraphics[width=0.75\linewidth]{figures/ttimestep.pdf}
         \caption{Time per timestep as a function of the grid size for different polynomial degrees.}
         \label{fig:titer}
     \end{center}
