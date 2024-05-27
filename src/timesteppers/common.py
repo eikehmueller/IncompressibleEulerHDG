@@ -85,7 +85,7 @@ class IncompressibleEuler(ABC):
         )
         self._Q = Function(V_DG)
         b_hdiv_projection = (
-            inner(self._Q, sigma) * dx + 2 * avg(inner(self._Q, n) * q) * dS
+            inner(self._Q, sigma) * dx + 2 * inner(avg(self._Q), avg(q * n)) * dS
         )
         self._projected_state = Function(self._W)
         problem_hdiv_projection = LinearVariationalProblem(
