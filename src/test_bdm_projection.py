@@ -29,14 +29,6 @@ el_trace = finat.ufl.BrokenElement(
 el_nedelec = finat.ufl.BrokenElement(
     finat.ufl.FiniteElement("N1curl", cell=mesh.ufl_cell(), degree=degree)
 )
-el_trace = finat.ufl.BrokenElement(
-    finat.ufl.FiniteElement("DGT", cell=mesh.ufl_cell(), degree=degree + 1)
-)
-
-el_nedelec = finat.ufl.BrokenElement(
-    finat.ufl.FiniteElement("N1curl", cell=mesh.ufl_cell(), degree=degree)
-)
-
 
 V_DG = VectorFunctionSpace(mesh, "DG", degree + 1)
 V_nedelec = FunctionSpace(mesh, el_nedelec)
