@@ -17,43 +17,52 @@ import numpy as np
 import finat
 from firedrake import *
 from firedrake.output import VTKFile
+from firedrake.__future__ import interpolate
 
 from auxilliary.logging import PerformanceLog, log_summary
 
 
-def interpolate_with_avg(Q, V, bcs):
+class InterpolateWithAvg:
     """Interpolate velocity to BDM space, averaging the dofs on the boundary.
 
     Original implementation by Pablo Brubeck, Oxford
-
-    :arg Q: velocity to interpolate
-    :arg V: BDM function space to interpolate into
-    :arg bcs: list of boundary conditions
     """
-    from firedrake.__future__ import interpolate
 
-    # Compute (inverse) multiplicity of function space.
+    def __init__(self, V, bcs):
+        """Initialise new instance
 
-    V
-    shapes = (V.finat_element.space_dimension(), np.prod(V.shape))
-    domain = "{[i,j]: 0 <= i < %d and 0 <= j < %d}" % shapes
-    instructions = """
-    for i, j
-        w[i,j] = w[i,j] + 1
-    end
-    """
-    inverse_multiplicity = Function(V)
-    par_loop((domain, instructions), dx, {"w": (inverse_multiplicity, INC)})
-    with inverse_multiplicity.dat.vec as wv:
-        wv.reciprocal()
+        :arg V: BDM function space to interpolate into
+        :arg bcs: list of boundary conditions
+        """
+        self.bcs = bcs
+        self.V = V
 
-    # interpolate with incremental access
-    Q_interpolate = assemble(interpolate(Q, V, access=INC))
-    with Q_interpolate.dat.vec as uv, inverse_multiplicity.dat.vec_ro as wv:
-        uv.pointwiseMult(uv, wv)
-    for bc in bcs:
-        bc.apply(Q_interpolate)
-    return Q_interpolate
+        # Compute (inverse) multiplicity of function space.
+
+        shapes = (self.V.finat_element.space_dimension(), np.prod(V.shape))
+        domain = "{[i,j]: 0 <= i < %d and 0 <= j < %d}" % shapes
+        instructions = """
+        for i, j
+            w[i,j] = w[i,j] + 1
+        end
+        """
+        self.inverse_multiplicity = Function(V)
+        par_loop((domain, instructions), dx, {"w": (self.inverse_multiplicity, INC)})
+        with self.inverse_multiplicity.dat.vec as wv:
+            wv.reciprocal()
+
+    def apply(self, Q):
+        """Carry out interpolation for a specific function
+
+        :arg Q: velocity to interpolate
+        """
+        # interpolate with incremental access
+        Q_interpolate = assemble(interpolate(Q, self.V, access=INC))
+        with Q_interpolate.dat.vec as uv, self.inverse_multiplicity.dat.vec_ro as wv:
+            uv.pointwiseMult(uv, wv)
+        for bc in self.bcs:
+            bc.apply(Q_interpolate)
+        return Q_interpolate
 
 
 def project_local_brute_force(Q, V, degree):
@@ -106,36 +115,46 @@ def project_local_brute_force(Q, V, degree):
     return Q_projected
 
 
-def project_local(Q, V, degree):
-    """Project to BDM space as in Guzman et al., using Slate
+class ProjectLocal:
+    """Project to BDM space as in Guzman et al., using Slate"""
 
-    :arg Q: velocity to interpolate
-    :arg V: BDM function space to interpolate into
-    :arg degree: polynomial degree of velocity space
-    """
-    mesh = V.mesh()
-    V_nedelec = FunctionSpace(mesh, "N1curl", degree - 1)
-    V_trace = FunctionSpace(mesh, "DGT", degree)
-    W = V_nedelec * V_trace
+    def __init__(self, V, degree):
+        """Initialise new instance
 
-    # Construct bilinear form
-    n = FacetNormal(mesh)
-    u = TrialFunction(V_BDM)
-    sigma, q = TestFunctions(W)
-    a_mixed = (
-        inner(u, sigma) * dx + 2 * avg(inner(u, q * n)) * dS + inner(u, n) * q * ds
-    )
+        :arg V: BDM function space to interpolate into
+        :arg degree: polynomial degree of velocity space
+        """
+        self.V = V
+        mesh = self.V.mesh()
+        V_nedelec = FunctionSpace(mesh, "N1curl", degree - 1)
+        V_trace = FunctionSpace(mesh, "DGT", degree)
+        self.W = V_nedelec * V_trace
 
-    # Right hand side
-    b_rhs_mixed = inner(Q, sigma) * dx + 2 * inner(avg(Q), avg(q * n)) * dS
+        # Construct bilinear form
+        n = FacetNormal(mesh)
+        u = TrialFunction(V_BDM)
+        sigma, q = TestFunctions(self.W)
+        a_mixed = (
+            inner(u, sigma) * dx + 2 * avg(inner(u, q * n)) * dS + inner(u, n) * q * ds
+        )
+        self.A = Tensor(a_mixed).blocks
+        self.S = (self.A[0, 0].T * self.A[0, 0] + self.A[1, 0].T * self.A[1, 0]).inv
 
-    A = Tensor(a_mixed).blocks
-    f = Tensor(b_rhs_mixed).blocks
-    S = (A[0, 0].T * A[0, 0] + A[1, 0].T * A[1, 0]).inv
-    solution = S * (A[0, 0].T * f[0] + A[1, 0].T * f[1])
-    Q_projected = Function(V)
-    assemble(solution, tensor=Q_projected)
-    return Q_projected
+    def apply(self, Q):
+        """Carry out projection for a specific function
+
+        :arg Q: velocity to interpolate
+        """
+        sigma, q = TestFunctions(self.W)
+        n = FacetNormal(self.V.mesh())
+        # Right hand side
+        b_rhs_mixed = inner(Q, sigma) * dx + 2 * inner(avg(Q), avg(q * n)) * dS
+
+        f = Tensor(b_rhs_mixed).blocks
+        solution = self.S * (self.A[0, 0].T * f[0] + self.A[1, 0].T * f[1])
+        Q_projected = Function(self.V)
+        assemble(solution, tensor=Q_projected)
+        return Q_projected
 
 
 # Random number generation
@@ -176,8 +195,9 @@ with PerformanceLog("global projection"):
     Q["global projection"].project(Q_original, bcs=bcs)
 
 # Method 2: interpolation
+interpolate_with_avg = InterpolateWithAvg(V_BDM, bcs)
 with PerformanceLog("interpolation"):
-    Q["interpolation"].assign(interpolate_with_avg(Q_original, V_BDM, bcs))
+    Q["interpolation"].assign(interpolate_with_avg.apply(Q_original))
 
 # Method 3: brute force local projection
 with PerformanceLog("local projection [brute force]"):
@@ -186,8 +206,9 @@ with PerformanceLog("local projection [brute force]"):
     )
 
 # Method 4: local projection with Slate
+project_local = ProjectLocal(V_BDM, degree)
 with PerformanceLog("local projection"):
-    Q["local projection"].assign(project_local(Q_original, V_BDM, degree))
+    Q["local projection"].assign(project_local.apply(Q_original))
 
 # Compute differences
 print()
