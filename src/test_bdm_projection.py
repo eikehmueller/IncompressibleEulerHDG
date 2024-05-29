@@ -31,7 +31,7 @@ class InterpolateWithAvg:
     def __init__(self, V, bcs):
         """Initialise new instance
 
-        :arg V: BDM function space to interpolate into
+        :arg V: BDM function space to interpolate to
         :arg bcs: list of boundary conditions
         """
         self.bcs = bcs
@@ -46,7 +46,7 @@ class InterpolateWithAvg:
             w[i,j] = w[i,j] + 1
         end
         """
-        self.inverse_multiplicity = Function(V)
+        self.inverse_multiplicity = Function(self.V)
         par_loop((domain, instructions), dx, {"w": (self.inverse_multiplicity, INC)})
         with self.inverse_multiplicity.dat.vec as wv:
             wv.reciprocal()
