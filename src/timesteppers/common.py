@@ -7,7 +7,7 @@ All timesteppers are expected to subclass the abstract subclass provided in this
 
 from abc import ABC, abstractmethod
 from firedrake import *
-import finat
+from firedrake.__future__ import interpolate
 
 __all__ = ["IncompressibleEuler"]
 
@@ -33,22 +33,6 @@ class IncompressibleEuler(ABC):
         self._dt = dt
         self._label = label
 
-        # function spaces for H(div) velocity projection
-        el_trace = finat.ufl.BrokenElement(
-            finat.ufl.FiniteElement(
-                "DGT", cell=self._mesh.ufl_cell(), degree=self.degree + 1
-            )
-        )
-        el_nedelec = finat.ufl.BrokenElement(
-            finat.ufl.FiniteElement(
-                "N1curl", cell=self._mesh.ufl_cell(), degree=self.degree
-            )
-        )
-        V_DG = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
-        V_nedelec = FunctionSpace(self._mesh, el_nedelec)
-        V_broken_trace = FunctionSpace(self._mesh, el_trace)
-        self._W = V_DG * V_nedelec * V_broken_trace
-
         # construct field for 1/h_F on facets
         V_coord = FunctionSpace(self._mesh, "DGT", 1)
         V_hinf = FunctionSpace(self._mesh, "DGT", 0)
@@ -71,30 +55,19 @@ class IncompressibleEuler(ABC):
                 "By": (coords_y, READ),
             },
         )
-        u, gamma, omega = TrialFunctions(self._W)
-        w, sigma, q = TestFunctions(self._W)
 
-        n = FacetNormal(self._mesh)
-        a_hdiv_projection = (
-            inner(u, sigma) * dx
-            + 2 * avg(inner(u, n) * q) * dS
-            + inner(u, n) * q * ds
-            + inner(gamma, w) * dx
-            + 2 * avg(omega * inner(n, w)) * dS
-            + omega * inner(n, w) * ds
-        )
-        self._Q = Function(V_DG)
-        b_hdiv_projection = (
-            inner(self._Q, sigma) * dx + 2 * inner(avg(self._Q), avg(q * n)) * dS
-        )
-        self._projected_state = Function(self._W)
-        problem_hdiv_projection = LinearVariationalProblem(
-            a_hdiv_projection, b_hdiv_projection, self._projected_state
-        )
-        solver_parameters = {"ksp_type": "gmres", "pc_type": "jacobi"}
-        self._solver_hdiv_projection = LinearVariationalSolver(
-            problem_hdiv_projection, solver_parameters=solver_parameters
-        )
+        self.V_BDM = FunctionSpace(self._mesh, "BDM", self.degree + 1)
+        shapes = (self.V_BDM.finat_element.space_dimension(), np.prod(self.V_BDM.shape))
+        domain = "{[i,j]: 0 <= i < %d and 0 <= j < %d}" % shapes
+        instructions = """
+        for i, j
+            w[i,j] = w[i,j] + 1
+        end
+        """
+        self.inverse_multiplicity = Function(self.V_BDM)
+        par_loop((domain, instructions), dx, {"w": (self.inverse_multiplicity, INC)})
+        with self.inverse_multiplicity.dat.vec as wv:
+            wv.reciprocal()
 
     @property
     def label(self):
@@ -104,13 +77,21 @@ class IncompressibleEuler(ABC):
     def project_bdm(self, Q):
         """Project velocity from DG space to BDM space.
 
-        After the projection the resulting velocity Q* has continuous normals
+        After the projection the resulting velocity Q* has continuous normals.
+
+        Original implementation of interpolation with averaging by Pablo Brubeck, Oxford.
 
         :arg Q: velocity to project
         """
-        self._Q.assign(Q)
-        self._solver_hdiv_projection.solve()
-        return self._projected_state.subfunctions[0]
+        # Interpolate to BDM space
+        Q_interpolate = assemble(interpolate(Q, self.V_BDM, access=INC))
+        # Scale by multiplicity
+        with Q_interpolate.dat.vec as uv, self.inverse_multiplicity.dat.vec_ro as wv:
+            uv.pointwiseMult(uv, wv)
+        # apply boundary conditions
+        for bc in [DirichletBC(self.V_BDM, (0, 0), j) for j in range(1, 5)]:
+            bc.apply(Q_interpolate)
+        return Q_interpolate
 
     @abstractmethod
     def solve(self, Q_initial, p_initial, f_rhs, T_final):

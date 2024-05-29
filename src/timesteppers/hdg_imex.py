@@ -54,6 +54,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self._V_p = FunctionSpace(self._mesh, "DG", self.degree)
         self._V_trace = FunctionSpace(self._mesh, "DGT", self.degree)
         self._V = self._V_Q * self._V_p * self._V_trace
+        self._V_BDM = FunctionSpace(self._mesh, "BDM", self.degree + 1)
 
         # state variable: (Q_i,p_i,lambda_i) at each stage i=0,1,...,s-1
         self._stage_state = []
@@ -68,7 +69,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             self._b_rhs.append(Function(self._V_Q))
             self._Q_tentative.append(Function(self._V_Q))
             if k < self.nstages - 1:
-                self._Qstar.append(Function(self._V_Q))
+                self._Qstar.append(Function(self._V_BDM))
 
         self.niter_tentative = Averager()
         self.niter_pressure = Averager()
