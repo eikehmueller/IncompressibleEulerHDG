@@ -27,7 +27,14 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
     """
 
     def __init__(
-        self, mesh, degree, dt, flux="upwind", use_projection_method=True, label=None
+        self,
+        mesh,
+        degree,
+        dt,
+        flux="upwind",
+        use_projection_method=True,
+        label=None,
+        callbacks=None,
     ):
         """Initialise new instance
 
@@ -37,6 +44,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
         :arg label: name of timestepping method
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(mesh, degree, dt, label)
         self.flux = flux
@@ -48,6 +56,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.tau = 1
         # number of Richardson iterations
         self.n_richardson = 2
+        # callbacks class
+        self.callbacks = [] if callbacks is None else callbacks
 
         # function spaces for velocity, pressure and trace variables
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
@@ -468,7 +478,9 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         p_0 = Function(self._V_p).interpolate(p_initial)
         p_0 -= assemble(p_0 * dx)
         self._current_state.subfunctions[0].assign(Q_0)
+        self._current_state.subfunctions[0].rename("Q")
         self._current_state.subfunctions[1].assign(p_0)
+        self._current_state.subfunctions[1].rename("p")
         self._reconstruct_trace(self._current_state)
         u, phi, lmbda = TrialFunctions(self._V)
         w, psi, mu = TestFunctions(self._V)
@@ -476,6 +488,13 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self.niter_pressure.reset()
         self.niter_final_pressure.reset()
         self.niter_pressure_reconstruction.reset()
+        for callback in self.callbacks:
+            callback.reset()
+            callback(
+                self._current_state.subfunctions[0],
+                self._current_state.subfunctions[1],
+                0,
+            )
         # loop over all timesteps
         for n in tqdm.tqdm(range(nt)):
             with PerformanceLog("timestep"):
@@ -561,6 +580,13 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         self._pressure_reconstruction.subfunctions[idx]
                     )
                 self._shift_pressure(self._current_state)
+            for callback in self.callbacks:
+                callback(
+                    self._current_state.subfunctions[0],
+                    self._current_state.subfunctions[1],
+                    tn + self._dt,
+                )
+
         print("average number of solver iterations")
         print(40 * "-")
         print(f"  tentative velocity its      : {self.niter_tentative.value:8.2f}")
@@ -584,7 +610,15 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
 class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
     """IMEX implementation of the first order implicit method"""
 
-    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+    def __init__(
+        self,
+        mesh,
+        degree,
+        dt,
+        flux="upwind",
+        use_projection_method=True,
+        callbacks=None,
+    ):
         """Initialise new instance
 
         :arg mesh: underlying mesh
@@ -592,9 +626,16 @@ class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX Implicit"
+            mesh,
+            degree,
+            dt,
+            flux,
+            use_projection_method,
+            label="HDG IMEX Implicit",
+            callbacks=callbacks,
         )
 
     @property
@@ -630,7 +671,15 @@ class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
 class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
     """IMEX ARS2(2,3,2) timestepper for the incompressible Euler equations"""
 
-    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+    def __init__(
+        self,
+        mesh,
+        degree,
+        dt,
+        flux="upwind",
+        use_projection_method=True,
+        callbacks=None,
+    ):
         """Initialise new instance
 
         :arg mesh: underlying mesh
@@ -638,9 +687,16 @@ class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS2(2,3,2)"
+            mesh,
+            degree,
+            dt,
+            flux,
+            use_projection_method,
+            label="HDG IMEX ARS2(2,3,2)",
+            callbacks=callbacks,
         )
 
     @property
@@ -682,7 +738,15 @@ class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
 class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
     """IMEX ARS3(4,4,3) timestepper for the incompressible Euler equations"""
 
-    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+    def __init__(
+        self,
+        mesh,
+        degree,
+        dt,
+        flux="upwind",
+        use_projection_method=True,
+        callbacks=None,
+    ):
         """Initialise new instance
 
         :arg mesh: underlying mesh
@@ -690,9 +754,16 @@ class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX ARS3(4,4,3)"
+            mesh,
+            degree,
+            dt,
+            flux,
+            use_projection_method,
+            label="HDG IMEX ARS3(4,4,3)",
+            callbacks=callbacks,
         )
 
     @property
@@ -744,7 +815,15 @@ class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
 class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
     """IMEX SSP2(3,3,2) timestepper for the incompressible Euler equations"""
 
-    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+    def __init__(
+        self,
+        mesh,
+        degree,
+        dt,
+        flux="upwind",
+        use_projection_method=True,
+        callbacks=None,
+    ):
         """Initialise new instance
 
         :arg mesh: underlying mesh
@@ -752,6 +831,7 @@ class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
             mesh,
@@ -760,6 +840,7 @@ class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
             flux,
             use_projection_method,
             label="HDG IMEX SSP2(3,3,2)",
+            callbacks=callbacks,
         )
 
     @property
@@ -801,7 +882,15 @@ class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
 class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
     """IMEX SSP3(4,3,3) timestepper for the incompressible Euler equations"""
 
-    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+    def __init__(
+        self,
+        mesh,
+        degree,
+        dt,
+        flux="upwind",
+        use_projection_method=True,
+        callbacks=None,
+    ):
         """Initialise new instance
 
         :arg mesh: underlying mesh
@@ -809,9 +898,16 @@ class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
-            mesh, degree, dt, flux, use_projection_method, label="HDG IMEX SSP3(4,3,3)"
+            mesh,
+            degree,
+            dt,
+            flux,
+            use_projection_method,
+            label="HDG IMEX SSP3(4,3,3)",
+            callbacks=callbacks,
         )
 
     @property

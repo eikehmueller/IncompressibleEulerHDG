@@ -7,6 +7,7 @@ from firedrake import *
 from firedrake.output import VTKFile
 
 from auxilliary.logging import log_summary
+from auxilliary.callbacks import AnimationCallback
 
 from timesteppers.conforming_implicit import *
 from timesteppers.dg_implicit import *
@@ -126,6 +127,13 @@ if __name__ == "__main__":
         help="only perform one timestep",
     )
 
+    parser.add_argument(
+        "--animation",
+        action="store_true",
+        default=False,
+        help="save velocity and pressure fields at the end of each timestep as an animation",
+    )
+
     args = parser.parse_args()
 
     # final time
@@ -141,6 +149,8 @@ if __name__ == "__main__":
         mesh = UnitSquareMesh(args.nx, args.nx, quadrilateral=False)
     elif args.problem == "kelvinhelmholtz":
         mesh = UnitDiskMesh(refinement_level=args.refinement)
+
+    callbacks = [AnimationCallback("evolution.pvd")] if args.animation else None
 
     if args.discretisation == "conforming":
         # conforming discretisation
@@ -177,6 +187,7 @@ if __name__ == "__main__":
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                callbacks=callbacks,
             )
         elif args.timestepper == "imex_ars3_443":
             timestepper = IncompressibleEulerHDGIMEXARS3_443(
@@ -185,6 +196,7 @@ if __name__ == "__main__":
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                callbacks=callbacks,
             )
         elif args.timestepper == "imex_ssp2_332":
             timestepper = IncompressibleEulerHDGIMEXSSP2_332(
@@ -193,6 +205,7 @@ if __name__ == "__main__":
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                callbacks=callbacks,
             )
         elif args.timestepper == "imex_ssp3_433":
             timestepper = IncompressibleEulerHDGIMEXSSP3_433(
@@ -201,6 +214,7 @@ if __name__ == "__main__":
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                callbacks=callbacks,
             )
         elif args.timestepper == "imex_implicit":
             timestepper = IncompressibleEulerHDGIMEXImplicit(
@@ -209,6 +223,7 @@ if __name__ == "__main__":
                 dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                callbacks=callbacks,
             )
         else:
             raise RuntimeError(
