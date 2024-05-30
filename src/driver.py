@@ -12,6 +12,7 @@ from timesteppers.conforming_implicit import *
 from timesteppers.dg_implicit import *
 from timesteppers.hdg_implicit import *
 from timesteppers.hdg_imex import *
+from model_problems import TaylorGreen
 
 #######################################################################################
 ##                                M A I N                                            ##
@@ -210,25 +211,6 @@ if __name__ == "__main__":
     print(f"timestepping method = {timestepper.label}")
     print()
 
-    # initial conditions for velocity and pressure
-    x, y = SpatialCoordinate(mesh)
-    Q_stationary = as_vector(
-        [
-            -cos((x - 1 / 2) * pi) * sin((y - 1 / 2) * pi),
-            sin((x - 1 / 2) * pi) * cos((y - 1 / 2) * pi),
-        ]
-    )
-    p_stationary = (sin((x - 1 / 2) * pi) ** 2 + sin((y - 1 / 2) * pi) ** 2) / 2
-    if kappa == 0:
-        f_rhs = 0
-    else:
-        if args.forcing == "exponential":
-            f_rhs = lambda t: -kappa * exp(-kappa * t) * Q_stationary
-        elif args.forcing == "constant":
-            f_rhs = lambda t: -kappa * Q_stationary
-        else:
-            raise NotImplementedError(f"Unknown forcing function: {args.forcing}")
-
     if args.test_pressure_solver:
         pcg = PCG64(seed=123456789)
         rg = RandomGenerator(pcg)
@@ -251,32 +233,19 @@ if __name__ == "__main__":
         print("WARNING: performing a single timestep only!")
         print()
 
-    Q, p = timestepper.solve(Q_stationary, p_stationary, f_rhs, t_final, args.warmup)
+    model_problem = TaylorGreen(timestepper._V_Q, timestepper._V_p, args.forcing, kappa)
+
+    Q_0, p_0 = model_problem.initial_condition()
+    Q, p = timestepper.solve(Q_0, p_0, model_problem.f_rhs(), t_final, args.warmup)
 
     log_summary()
 
     if not args.warmup:
-        V_Q = timestepper._V_Q
-        V_p = timestepper._V_p
 
         Q.rename("velocity")
         p.rename("pressure")
 
-        if args.forcing == "exponential":
-            Q_exact = assemble(
-                exp(-kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
-            )
-            p_exact = assemble(
-                exp(-2 * kappa * t_final) * Function(V_p).interpolate(p_stationary)
-            )
-        elif args.forcing == "constant":
-            Q_exact = assemble(
-                (1.0 - kappa * t_final) * Function(V_Q).interpolate(Q_stationary)
-            )
-            p_exact = assemble(
-                (1 - kappa * t_final) ** 2 * Function(V_p).interpolate(p_stationary)
-            )
-        p_exact -= assemble(p_exact * dx)
+        Q_exact, p_exact = model_problem.solution(t_final)
         Q_exact.rename("velocity_exact")
         p_exact.rename("pressure_exact")
 
@@ -292,6 +261,7 @@ if __name__ == "__main__":
         print(f"pressure error = {p_error_nrm}")
         print()
 
+        V_p = timestepper._V_p
         divQ = Function(V_p, name="divergence")
         phi = TrialFunction(V_p)
         psi = TestFunction(V_p)
