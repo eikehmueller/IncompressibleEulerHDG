@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from firedrake import *
 
-__all__ = ["TaylorGreen"]
+__all__ = ["TaylorGreen", "KelvinHelmholtz"]
 
 
 class ModelProblem(ABC):
@@ -102,3 +102,39 @@ class TaylorGreen(ModelProblem):
             )
         p_exact -= assemble(p_exact * dx)
         return Q_exact, p_exact
+
+
+class KelvinHelmholtz(ModelProblem):
+    """Kelvin Helmholtz instability on circular mesh"""
+
+    def __init__(self, V_Q, V_p):
+        """Initialise new instance
+
+        :arg V_Q: velocity function space
+        :arg V_p: pressure function space
+        """
+        super().__init__(V_Q, V_p)
+        r_max = 0.5
+        x, y = SpatialCoordinate(self.V_Q.mesh())
+        self.Q_stationary = conditional(
+            x**2 + y**2 < r_max**2, as_vector([-y, x]), as_vector([0, 0])
+        )
+        self.p_stationary = 0
+
+    def initial_condition(self):
+        """Return initial condition"""
+        return self.Q_stationary, self.p_stationary
+
+    def f_rhs(self):
+        """Return expression for right hand side forcing"""
+        return lambda t: as_vector([0, 0])
+
+    def solution(self, t):
+        """Return the solution at some finite time t
+
+        :arg t: time at which to evaluate the solution
+        """
+        return (
+            Function(self.V_Q).interpolate(self.Q_stationary),
+            Function(self.V_p).interpolate(self.p_stationary),
+        )

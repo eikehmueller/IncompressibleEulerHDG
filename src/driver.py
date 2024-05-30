@@ -12,7 +12,7 @@ from timesteppers.conforming_implicit import *
 from timesteppers.dg_implicit import *
 from timesteppers.hdg_implicit import *
 from timesteppers.hdg_imex import *
-from model_problems import TaylorGreen
+from model_problems import TaylorGreen, KelvinHelmholtz
 
 #######################################################################################
 ##                                M A I N                                            ##
@@ -23,12 +23,31 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Mesh specifications and polynomial degree")
     parser.add_argument(
+        "--problem",
+        metavar="problem",
+        choices=["taylorgreen", "kelvinhelmholtz"],
+        type=str,
+        action="store",
+        default="taylorgreen",
+        help="model problem to solve",
+    )
+
+    parser.add_argument(
         "--nx",
         metavar="nx",
         type=int,
         action="store",
         default=8,
         help="number of grid cells in x-direction",
+    )
+
+    parser.add_argument(
+        "--refinement",
+        metavar="refinement",
+        type=int,
+        action="store",
+        default=2,
+        help="refinement level for unit disk mesh",
     )
 
     parser.add_argument(
@@ -118,7 +137,10 @@ if __name__ == "__main__":
     # decay constant, kappa=0 corresponds to stationary vortex
     kappa = 0.5
 
-    mesh = UnitSquareMesh(args.nx, args.nx, quadrilateral=False)
+    if args.problem == "taylorgreen":
+        mesh = UnitSquareMesh(args.nx, args.nx, quadrilateral=False)
+    elif args.problem == "kelvinhelmholtz":
+        mesh = UnitDiskMesh(refinement_level=args.refinement)
 
     if args.discretisation == "conforming":
         # conforming discretisation
@@ -197,7 +219,13 @@ if __name__ == "__main__":
     print("! timesteppers for incompressible Euler equations !")
     print("+-------------------------------------------------+")
     print()
-    print(f"mesh size = {args.nx} x {args.nx}")
+    print(f"model problem = {args.problem}")
+    if args.problem == "taylorgreen":
+        print(f"mesh size = {args.nx} x {args.nx}")
+        print(f"forcing = {args.forcing}")
+        print(f"kappa = {kappa}")
+    elif args.problem == "kelvinhelmholtz":
+        print(f"mesh refinement = {args.refinement}")
     print(f"polynomial degree = {args.degree}")
     print(f"final time = {t_final}")
     print(f"number of timesteps = {nt}")
@@ -205,8 +233,6 @@ if __name__ == "__main__":
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
     print(f"number of richardson iterations = {timestepper.n_richardson}")
-    print(f"forcing = {args.forcing}")
-    print(f"kappa = {kappa}")
     print(f"use projection method = {args.use_projection_method}")
     print(f"timestepping method = {timestepper.label}")
     print()
@@ -233,7 +259,12 @@ if __name__ == "__main__":
         print("WARNING: performing a single timestep only!")
         print()
 
-    model_problem = TaylorGreen(timestepper._V_Q, timestepper._V_p, args.forcing, kappa)
+    if args.problem == "taylorgreen":
+        model_problem = TaylorGreen(
+            timestepper._V_Q, timestepper._V_p, args.forcing, kappa
+        )
+    elif args.problem == "kelvinhelmholtz":
+        model_problem = KelvinHelmholtz(timestepper._V_Q, timestepper._V_p)
 
     Q_0, p_0 = model_problem.initial_condition()
     Q, p = timestepper.solve(Q_0, p_0, model_problem.f_rhs(), t_final, args.warmup)
