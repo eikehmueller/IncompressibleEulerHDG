@@ -75,9 +75,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
                 + advective_facet_flux
             )
 
-            bcs = [
-                DirichletBC(self._V.sub(0), as_vector([0, 0]), j + 1) for j in range(4)
-            ]
+            bcs = [DirichletBC(self._V.sub(0), as_vector([0, 0]), "on_boundary")]
 
             Q_p_hat = Function(self._V)
 
@@ -102,9 +100,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
             )
 
             # homogeneous Dirichlet boundary conditions (zero normal derivative)
-            bcs = [
-                DirichletBC(self._V.sub(0), as_vector([0, 0]), j + 1) for j in range(4)
-            ]
+            bcs = [DirichletBC(self._V.sub(0), as_vector([0, 0]), "on_boundary")]
             solve(
                 a_mixed == b_rhs_mixed,
                 dQp,

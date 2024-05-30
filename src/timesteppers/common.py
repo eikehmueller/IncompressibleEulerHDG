@@ -89,8 +89,8 @@ class IncompressibleEuler(ABC):
         with Q_interpolate.dat.vec as uv, self.inverse_multiplicity.dat.vec_ro as wv:
             uv.pointwiseMult(uv, wv)
         # apply boundary conditions
-        for bc in [DirichletBC(self.V_BDM, (0, 0), j) for j in range(1, 5)]:
-            bc.apply(Q_interpolate)
+        bc = DirichletBC(self.V_BDM, (0, 0), "on_boundary")
+        bc.apply(Q_interpolate)
         return Q_interpolate
 
     @abstractmethod
