@@ -2,7 +2,10 @@
 Utility classes
 """
 
-__all__ = ["Averager"]
+import numpy as np
+from firedrake import *
+
+__all__ = ["Averager", "gridspacing"]
 
 
 class Averager:
@@ -41,3 +44,36 @@ class Averager:
     def __repr__(self):
         """Internal string representation"""
         return f"{self.value} (averaged over {self.n_samples} samples)"
+
+
+def gridspacing(mesh):
+    """Compute smallest and largest edge length of 2d mesh
+
+    :arg mesh: given mesh
+    """
+
+    # construct field for 1/h_F on facets
+    V_coord = FunctionSpace(mesh, "DGT", 1)
+    V_h = FunctionSpace(mesh, "DGT", 0)
+    x, y = SpatialCoordinate(mesh)
+    coords_x = Function(V_coord).interpolate(x)
+    coords_y = Function(V_coord).interpolate(y)
+    hF = Function(V_h)
+    domain = "{[i]: 0 <= i < A.dofs}"
+    instructions = """
+    for i
+        A[i] = sqrt((Bx[2*i]-Bx[2*i+1])*(Bx[2*i]-Bx[2*i+1]) + (By[2*i]-By[2*i+1])*(By[2*i]-By[2*i+1]))
+    end
+    """
+    par_loop(
+        (domain, instructions),
+        dx,
+        {
+            "A": (hF, WRITE),
+            "Bx": (coords_x, READ),
+            "By": (coords_y, READ),
+        },
+    )
+    h_min = np.min(hF.dat.data)
+    h_max = np.max(hF.dat.data)
+    return h_min, h_max

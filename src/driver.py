@@ -6,6 +6,7 @@ import argparse
 from firedrake import *
 from firedrake.output import VTKFile
 
+from auxilliary.utils import gridspacing
 from auxilliary.logging import log_summary
 from auxilliary.callbacks import AnimationCallback
 
@@ -58,6 +59,15 @@ if __name__ == "__main__":
         action="store",
         default=1,
         help="polynomial degree",
+    )
+
+    parser.add_argument(
+        "--tfinal",
+        metavar="tfinal",
+        type=float,
+        action="store",
+        default=1.0,
+        help="final time",
     )
 
     parser.add_argument(
@@ -136,19 +146,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # final time
-    t_final = 1.0
-    # number of timesteps
-    nt = args.nx
-    # resulting timestep size
-    dt = t_final / nt
-    # decay constant, kappa=0 corresponds to stationary vortex
-    kappa = 0.5
-
     if args.problem == "taylorgreen":
         mesh = UnitSquareMesh(args.nx, args.nx, quadrilateral=False)
     elif args.problem == "kelvinhelmholtz":
         mesh = UnitDiskMesh(refinement_level=args.refinement)
+
+    # number of timesteps
+    h_min, _ = gridspacing(mesh)
+    nt = int(np.ceil(1 / h_min))
+    # resulting timestep size
+    dt = 1 / nt
+    # decay constant, kappa=0 corresponds to stationary vortex
+    kappa = 0.5
 
     callbacks = [AnimationCallback("evolution.pvd")] if args.animation else None
 
@@ -242,7 +251,7 @@ if __name__ == "__main__":
     elif args.problem == "kelvinhelmholtz":
         print(f"mesh refinement = {args.refinement}")
     print(f"polynomial degree = {args.degree}")
-    print(f"final time = {t_final}")
+    print(f"final time = {args.tfinal}")
     print(f"number of timesteps = {nt}")
     print(f"timestep size = {dt}")
     print(f"discretisation = {args.discretisation}")
@@ -282,7 +291,7 @@ if __name__ == "__main__":
         model_problem = KelvinHelmholtz(timestepper._V_Q, timestepper._V_p)
 
     Q_0, p_0 = model_problem.initial_condition()
-    Q, p = timestepper.solve(Q_0, p_0, model_problem.f_rhs(), t_final, args.warmup)
+    Q, p = timestepper.solve(Q_0, p_0, model_problem.f_rhs(), args.tfinal, args.warmup)
 
     log_summary()
 
@@ -291,7 +300,7 @@ if __name__ == "__main__":
         Q.rename("velocity")
         p.rename("pressure")
 
-        Q_exact, p_exact = model_problem.solution(t_final)
+        Q_exact, p_exact = model_problem.solution(args.tfinal)
         Q_exact.rename("velocity_exact")
         p_exact.rename("pressure_exact")
 
