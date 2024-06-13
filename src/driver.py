@@ -14,7 +14,7 @@ from timesteppers.conforming_implicit import *
 from timesteppers.dg_implicit import *
 from timesteppers.hdg_implicit import *
 from timesteppers.hdg_imex import *
-from model_problems import TaylorGreen, KelvinHelmholtz
+from model_problems import TaylorGreen, KelvinHelmholtz, DoubleLayerShearFlow
 
 #######################################################################################
 ##                                M A I N                                            ##
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--problem",
         metavar="problem",
-        choices=["taylorgreen", "kelvinhelmholtz"],
+        choices=["taylorgreen", "kelvinhelmholtz", "shear"],
         type=str,
         action="store",
         default="taylorgreen",
@@ -148,6 +148,8 @@ if __name__ == "__main__":
 
     if args.problem == "taylorgreen":
         mesh = UnitSquareMesh(args.nx, args.nx, quadrilateral=False)
+    elif args.problem == "shear":
+        mesh = PeriodicUnitSquareMesh(args.nx, args.nx, quadrilateral=False)
     elif args.problem == "kelvinhelmholtz":
         mesh = UnitDiskMesh(refinement_level=args.refinement)
 
@@ -287,6 +289,8 @@ if __name__ == "__main__":
         model_problem = TaylorGreen(
             timestepper._V_Q, timestepper._V_p, args.forcing, kappa
         )
+    elif args.problem == "shear":
+        model_problem = DoubleLayerShearFlow(timestepper._V_Q, timestepper._V_p)
     elif args.problem == "kelvinhelmholtz":
         model_problem = KelvinHelmholtz(timestepper._V_Q, timestepper._V_p)
 

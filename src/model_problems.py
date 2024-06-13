@@ -138,3 +138,52 @@ class KelvinHelmholtz(ModelProblem):
             Function(self.V_Q).interpolate(self.Q_stationary),
             Function(self.V_p).interpolate(self.p_stationary),
         )
+
+
+class DoubleLayerShearFlow(ModelProblem):
+    """Double layer shear flow as described in
+
+    Guzmán, J., Shu, C.W. and Sequeira, F.A., 2017.
+    "H (div) conforming and DG methods for incompressible Euler’s equations. "
+    IMA Journal of Numerical Analysis, 37(4), pp.1733-1771.
+    """
+
+    def __init__(self, V_Q, V_p, rho=1 / 30, delta=0.05):
+        """Initialise new instance
+
+        :arg V_Q: velocity function space
+        :arg V_p: pressure function space
+        :arg rho: width of shear layer
+        :arg delta: magnitude of vertical velocity
+        """
+        super().__init__(V_Q, V_p)
+        self.rho = rho
+        self.delta = delta
+        x, y = SpatialCoordinate(self.V_Q.mesh())
+        self.Q_initial = as_vector(
+            [
+                conditional(
+                    y <= 1 / 2, tanh((y - 1 / 4) / rho), tanh((3 / 4 - y) / rho)
+                ),
+                self.delta * sin(2 * pi * x),
+            ]
+        )
+        self.p_initial = 0
+
+    def initial_condition(self):
+        """Return initial condition"""
+        return self.Q_initial, self.p_initial
+
+    def f_rhs(self):
+        """Return expression for right hand side forcing"""
+        return lambda t: as_vector([0, 0])
+
+    def solution(self, t):
+        """Return the solution at some finite time t
+
+        :arg t: time at which to evaluate the solution
+        """
+        return (
+            Function(self.V_Q).interpolate(self.Q_initial),
+            Function(self.V_p).interpolate(self.p_initial),
+        )
