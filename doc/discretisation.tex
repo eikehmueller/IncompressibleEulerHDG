@@ -742,6 +742,94 @@ with arbitrary scalar function $\Psi(t)$ can be constructed as
     p(x,y,t) & = \Psi(t)^2 p_s(x,y).\label{eqn:exact_solution}
 \end{xalignat}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Double shear layer flow}\label{sec:shear_test}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The initial condition for the double shear layer flow in \cite{Bell1989} (which is also used as a testcase in \cite{Guzman2016}) is given by
+\begin{equation}
+    \begin{aligned}
+        Q_0(x,y)   & = \begin{pmatrix}
+                           Q_{0,x}(y) \\
+                           Q_{0,y}(x)
+                       \end{pmatrix}    \qquad\text{with}                                                               \\
+        Q_{0,x}(y) & = \begin{cases}
+                           \tanh\left(\left(y-\frac{1}{4}\right)/\rho\right) & \text{for $0\le y\le \frac{1}{2}$,} \\
+                           \tanh\left(\left(\frac{3}{4}-y\right)/\rho\right) & \text{for $\frac{1}{2}<y\le 1$.}
+                       \end{cases} \\
+        Q_{0,y}(x) & = \delta \sin(2\pi x)
+    \end{aligned}
+    \label{eqn:shear_flow_velocity_IC}
+\end{equation}
+with the parameters $\rho=1/30$ and $\delta=0.05$.
+Periodic boundary conditions are assumed in both dimensions. The corresponding initial pressure $p_0(x,y)$ can be obtained by multiplying Eq. \eqref{eqn:incompressible_euler} by $\nabla$. This results in following elliptic problem for the initial pressure
+\begin{equation}
+    - \Delta p_0 = \nabla \left( (Q_0 \cdot \nabla) Q_0 \right) \label{eqn:shear_flow_pressure_IC}
+\end{equation}
+With the explicit expressions for the initial velocity in Eq. \eqref{eqn:shear_flow_velocity_IC}, Eq. \eqref{eqn:shear_flow_pressure_IC} can be written as
+\begin{equation}
+    - \Delta p_0(x,y) = 2\left(\partial_x Q_{0,y}(x)\right)\left(\partial_y Q_{0,x}(y)\right).
+    \label{eqn:shear_flow_IP_equation}
+\end{equation}
+We now make the ansatz
+\begin{equation}
+    p_0(x,y) = p_{0,y}(y) \cos(2\pi x)+P_0,\label{eqn:shear_flow_ansatz}
+\end{equation}
+where the constant  $P_0$ is chosen such that the average of $p_0$ is zero across the domain. Inserting Eq. \eqref{eqn:shear_flow_ansatz} into Eq. \eqref{eqn:shear_flow_IP_equation} results in an second elliptic problem in one dimension for $p_{0,y}$:
+\begin{equation}
+    \begin{aligned}
+        4\pi^2 p_{0,y} - p_{0,y}'' & = 4\pi^2 g(y)                                                                  \qquad\text{with $g(y) := \frac{1}{4\pi} \partial_y Q_{0,x}(y)$.}
+    \end{aligned}\label{eqn:shear_flow_1d_problem}
+\end{equation}
+Using the definition of $Q_{0,x}(y)$ in Eq. \eqref{eqn:shear_flow_velocity_IC}, the function $g(y)$ can be written down explicitly as
+\begin{equation}
+    g(y)  = \begin{cases}
+        (4\pi\rho)^{-1} \left(1-\tanh^2\left(\left(y-\frac{1}{4}\right)/\rho\right)\right) & \text{for $0\le y\le \frac{1}{2}$,} \\
+        -(4\pi\rho)^{-1}\left(1-\tanh^2\left(\left(\frac{3}{4}-y\right)/\rho\right)\right) & \text{for $\frac{1}{2}<y \le 1$.}
+    \end{cases}
+\end{equation}
+Note that while $Q_{0,x}(y)$ is symmetric around the point $y=\frac{1}{2}$, $g(y)$ is antisymmetric around this point, i.e. $g(1-y) = -g(y)$. To solve Eq. \eqref{eqn:shear_flow_1d_problem} we introduce the variable transformation $z = \pi(2y-1)$ and two new functions $\theta$, $f$ with $\theta(z)=p_{0,y}(y)$, $f(z)=g(y)$. This results in a second order problem on the periodic interval $[-\pi,+\pi]$:
+\begin{equation}
+    \theta - \theta''             = f(z)\label{eqn:shear_flow_1d_problem_reduced}
+\end{equation}
+with the odd function
+\begin{equation}
+    f(z) =
+    (4\pi \rho)^{-1}\cdot
+    \begin{cases}
+        1-\tanh^2\left(\frac{\pi+2z}{4\pi\rho}\right)  & \text{for $-\pi \le z\le0 $} \\
+        -1+\tanh^2\left(\frac{\pi-2z}{4\pi\rho}\right) & \text{for $0<z\le \pi$}.
+    \end{cases}
+\end{equation}
+To solve Eq. \eqref{eqn:shear_flow_1d_problem_reduced} we Fourier-expand the right hand side $f(z)$ as
+\begin{xalignat}{2}
+    f(z) &= \sum_{k=0}^{\infty} a_k \sin((2k+1) z), &
+    a_k &= \frac{1}{\pi}\int_{-\pi}^{+\pi} f(z) \sin((2k+1)z )\;dz\label{eqn:fourier_series_f}
+\end{xalignat}
+where only odd integers contribute to the sum since the function $f$ has the additional symmetries $f(-\pi+z)=f(-z)$ for $-\pi\le z\le 0$ and $f(\pi-z)=f(z)$ for $0<z\le \pi$.
+This results in
+\begin{equation}
+    \theta(z) = \sum_{k=0}^{\infty} a_k\frac{\sin((2k+1) z)}{1+(2k+1)^2} \label{eqn:fourier_series_theta}.
+\end{equation}
+Putting everything together, this gives the following expression for the initial pressure:
+\begin{equation}
+    p_0(x,y) = \cos(2\pi x) \sum_{k=0}^{\infty} a_k\frac{\sin\left(2\pi (2k+1)\left(y-\tfrac{1}{2}\right)\right)}{1+(2k+1)^2}\label{eqn:fourier_series_final}
+\end{equation}
+where setting $P_0=0$ guarantees that $\int_\Omega p_0(x,y)\;dx\;dy = 0$.
+\begin{figure}
+    \begin{minipage}{0.45\linewidth}
+        \begin{center}
+            \includegraphics[width=\linewidth]{figures/shear_flow_initial_condition.pdf}
+        \end{center}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\linewidth}
+        \begin{center}
+            \includegraphics[width=\linewidth]{figures/shear_flow_fourier_coefficients.pdf}
+        \end{center}
+    \end{minipage}
+    \caption{Initial condition for double layer shear flow in \cite{Bell1989} (left) and Fourier coefficients of the expansions in Eqs. \eqref{eqn:fourier_series_f}, \eqref{eqn:fourier_series_theta} and \eqref{eqn:fourier_series_final} (right). The results are obtained by truncation the Fourier series after $28$ terms.}
+    \label{fig:shear_flow_initial_condition}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \bibliographystyle{unsrt}
 \bibliography{discretisation}
 \end{document}
