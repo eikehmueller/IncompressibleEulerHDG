@@ -1,6 +1,7 @@
 """Collection of model problems"""
 
 from abc import ABC, abstractmethod
+import scipy.integrate as integrate
 from firedrake import *
 
 __all__ = ["TaylorGreen", "KelvinHelmholtz"]
@@ -168,7 +169,31 @@ class DoubleLayerShearFlow(ModelProblem):
                 self.delta * sin(2 * pi * x),
             ]
         )
+
+        # Construct expression for initial pressure
+        kmax = 28  # number of Fourier coefficients to use
         self.p_initial = 0
+        for k in range(kmax):
+            fourier_coefficient = integrate.quad(
+                lambda z: np.where(
+                    z <= 0.0,
+                    1 - np.tanh((np.pi + 2 * z) / (4 * np.pi * self.rho)) ** 2,
+                    -1 + np.tanh((np.pi - 2 * z) / (4 * np.pi * self.rho)) ** 2,
+                )
+                / (np.pi**2 * self.rho),
+                -np.pi,
+                +np.pi,
+                weight="sin",
+                wvar=2 * k + 1,
+                epsabs=1e-12,
+                epsrel=1e-12,
+            )[0]
+            self.p_initial += (
+                fourier_coefficient
+                * sin((2 * k + 1) * (2 * y - 1) * pi)
+                / (1 + (2 * k + 1) ** 2)
+            )
+        self.p_initial *= self.delta * cos(2 * pi * x)
 
     def initial_condition(self):
         """Return initial condition"""
