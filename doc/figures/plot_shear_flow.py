@@ -13,7 +13,7 @@ rho = 1 / 30
 
 
 def Q_0x(z):
-    """Initial velocoy in the x-direction"""
+    """Initial velocity in the x-direction"""
     return np.where(
         z <= 0.0,
         np.tanh((np.pi + 2 * z) / (4 * np.pi * rho)),
@@ -25,11 +25,9 @@ def f(z):
     """Right hand side for the one-dimensional elliptic problem"""
     return np.where(
         z <= 0.0,
-        1 / (4 * np.pi * rho) * (1 - np.tanh((np.pi + 2 * z) / (4 * np.pi * rho)) ** 2),
-        -1
-        / (4 * np.pi * rho)
-        * (1 - np.tanh((np.pi - 2 * z) / (4 * np.pi * rho)) ** 2),
-    )
+        1 - np.tanh((np.pi + 2 * z) / (4 * np.pi * rho)) ** 2,
+        -1 + np.tanh((np.pi - 2 * z) / (4 * np.pi * rho)) ** 2,
+    ) / (np.pi * rho)
 
 
 Y = 0
