@@ -57,7 +57,7 @@ class AnimationCallback(Callback):
         chi = TestFunction(V_vorticity)
         psi = TrialFunction(V_vorticity)
         xi = Function(V_vorticity, name="vorticity")
-        b_rhs = chi * inner(as_matrix([[0, -1], [+1, 0]]), grad(self.Q_proxy)) * dx
+        b_rhs = chi * curl(self.Q_proxy) * dx
         a_project = inner(chi, psi) * dx
         lvp = LinearVariationalProblem(a_project, b_rhs, xi)
         lvs = LinearVariationalSolver(lvp)
