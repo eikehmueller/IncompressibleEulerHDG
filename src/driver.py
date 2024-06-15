@@ -170,10 +170,16 @@ if __name__ == "__main__":
             not args.use_projection_method
         ), "Can not use projection method with conforming discretsation"
         if args.timestepper == "implicit":
-            timestepper = IncompressibleEulerConformingImplicit(mesh, dt, args.flux)
-        raise RuntimeError(
-            "Invalid timestepping method for conforming discretisation: '{args.timestepper}'"
-        )
+            timestepper = IncompressibleEulerConformingImplicit(
+                mesh,
+                dt,
+                args.flux,
+                callbacks=callbacks,
+            )
+        else:
+            raise RuntimeError(
+                "Invalid timestepping method for conforming discretisation: '{args.timestepper}'"
+            )
     elif args.discretisation == "dg":
         # DG discretisation
         assert (
@@ -258,7 +264,8 @@ if __name__ == "__main__":
     print(f"timestep size = {dt}")
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
-    print(f"number of richardson iterations = {timestepper.n_richardson}")
+    if type(timestepper) is IncompressibleEulerHDGIMEX:
+        print(f"number of richardson iterations = {timestepper.n_richardson}")
     print(f"use projection method = {args.use_projection_method}")
     print(f"timestepping method = {timestepper.label}")
     print()
