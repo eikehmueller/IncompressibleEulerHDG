@@ -496,10 +496,10 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 0,
             )
         # loop over all timesteps
-        for n in tqdm.tqdm(range(nt)):
+        for k in tqdm.tqdm(range(nt)):
             with PerformanceLog("timestep"):
                 # evaluate RHS at intermediate stages
-                tn = n * self._dt  # current time
+                tn = k * self._dt  # current time
                 for i in range(self.nstages):
                     self._b_rhs[i].interpolate(
                         f_rhs(Constant(tn + self._c_expl[i] * self._dt))
