@@ -26,7 +26,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Mesh specifications and polynomial degree")
     parser.add_argument(
         "--problem",
-        metavar="problem",
         choices=["taylorgreen", "kelvinhelmholtz", "shear"],
         type=str,
         action="store",
@@ -310,23 +309,6 @@ if __name__ == "__main__":
 
         Q.rename("velocity")
         p.rename("pressure")
-
-        Q_exact, p_exact = model_problem.solution(args.tfinal)
-        Q_exact.rename("velocity_exact")
-        p_exact.rename("pressure_exact")
-
-        Q_error = assemble(Q - Q_exact)
-        Q_error.rename("velocity_error")
-        p_error = assemble(p - p_exact)
-        p_error.rename("pressure_error")
-
-        Q_error_nrm = np.sqrt(assemble(inner(Q_error, Q_error) * dx))
-        p_error_nrm = np.sqrt(assemble((p_error) ** 2 * dx))
-        print()
-        print(f"velocity error = {Q_error_nrm}")
-        print(f"pressure error = {p_error_nrm}")
-        print()
-
         V_p = timestepper._V_p
         divQ = Function(V_p, name="divergence")
         phi = TrialFunction(V_p)
@@ -336,5 +318,25 @@ if __name__ == "__main__":
         b_hdiv_projection = div(Q) * psi * dx
         solve(a_mass == b_hdiv_projection, divQ)
 
+        output_fields = [Q, p, divQ]
+        exact_solution = model_problem.solution(args.tfinal)
+        if exact_solution is not None:
+            Q_exact, p_exact = exact_solution
+            Q_exact.rename("velocity_exact")
+            p_exact.rename("pressure_exact")
+
+            Q_error = assemble(Q - Q_exact)
+            Q_error.rename("velocity_error")
+            p_error = assemble(p - p_exact)
+            p_error.rename("pressure_error")
+
+            Q_error_nrm = np.sqrt(assemble(inner(Q_error, Q_error) * dx))
+            p_error_nrm = np.sqrt(assemble((p_error) ** 2 * dx))
+            print()
+            print(f"velocity error = {Q_error_nrm}")
+            print(f"pressure error = {p_error_nrm}")
+            print()
+            output_fields += [Q_exact, Q_error, p_exact, p_error]
+
         outfile = VTKFile("solution.pvd")
-        outfile.write(Q, Q_exact, Q_error, p, p_exact, p_error, divQ)
+        outfile.write(*output_fields)

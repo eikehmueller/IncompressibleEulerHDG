@@ -27,12 +27,12 @@ class ModelProblem(ABC):
     def f_rhs(self):
         """Return expression for right hand side forcing"""
 
-    @abstractmethod
     def solution(self, t):
         """Return the solution at some finite time t
 
         :arg t: time at which to evaluate the solution
         """
+        return None
 
 
 class TaylorGreen(ModelProblem):
@@ -130,16 +130,6 @@ class KelvinHelmholtz(ModelProblem):
         """Return expression for right hand side forcing"""
         return lambda t: as_vector([0, 0])
 
-    def solution(self, t):
-        """Return the solution at some finite time t
-
-        :arg t: time at which to evaluate the solution
-        """
-        return (
-            Function(self.V_Q).interpolate(self.Q_stationary),
-            Function(self.V_p).interpolate(self.p_stationary),
-        )
-
 
 class DoubleLayerShearFlow(ModelProblem):
     """Double layer shear flow as described in
@@ -202,13 +192,3 @@ class DoubleLayerShearFlow(ModelProblem):
     def f_rhs(self):
         """Return expression for right hand side forcing"""
         return lambda t: as_vector([0, 0])
-
-    def solution(self, t):
-        """Return the solution at some finite time t
-
-        :arg t: time at which to evaluate the solution
-        """
-        return (
-            Function(self.V_Q).interpolate(self.Q_initial),
-            Function(self.V_p).interpolate(self.p_initial),
-        )

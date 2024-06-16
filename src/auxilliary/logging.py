@@ -33,6 +33,8 @@ class PerformanceLog(ContextDecorator):
 
 def log_summary():
     """Print summary of performance logging"""
+    if len(PerformanceLog.data) == 0:
+        return
     head_label = "timer"
     head_calls = "ncall"
     head_total = "total"
