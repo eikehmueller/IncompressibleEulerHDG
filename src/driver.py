@@ -185,7 +185,9 @@ if __name__ == "__main__":
             not args.use_projection_method
         ), "Can not use projection method with DG discretsation"
         if args.timestepper == "implicit":
-            timestepper = IncompressibleEulerDGImplicit(mesh, args.degree, dt)
+            timestepper = IncompressibleEulerDGImplicit(
+                mesh, args.degree, dt, callbacks=callbacks
+            )
         else:
             raise RuntimeError(
                 "Invalid timestepping method for DG discretisation: '{args.timestepper}'"
@@ -193,8 +195,13 @@ if __name__ == "__main__":
     elif args.discretisation == "hdg":
         # HDG discretisation
         if args.timestepper == "implicit":
-            timestepper = IncompressibleEulerHDGIMEXImplicit(
-                mesh, args.degree, dt, args.flux, args.use_projection_method
+            timestepper = IncompressibleEulerHDGImplicit(
+                mesh,
+                args.degree,
+                dt,
+                args.flux,
+                args.use_projection_method,
+                callbacks=callbacks,
             )
         elif args.timestepper == "imex_ars2_232":
             timestepper = IncompressibleEulerHDGIMEXARS2_232(

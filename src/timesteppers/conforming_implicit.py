@@ -24,7 +24,6 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         super().__init__(mesh, 1, dt, label="Conforming Implicit")
         self.flux = flux
         assert self.flux in ["upwind", "centered"]
-        # callbacks class
         self.callbacks = [] if callbacks is None else callbacks
 
         # function spaces for velocity, pressure and trace variables
@@ -44,8 +43,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         :arg T_final: final time
         :arg warmup: perform warmup run (1 timestep only)
         """
-        nt = 1 if warmup else int(T_final / self._dt)  # number of timesteps
-        assert nt * self._dt - T_final < 1.0e-12  # check that dt divides the final time
+        nt = self.get_timesteps(T_final, warmup)
         # Initial conditions
         Q = Function(self._V_Q, name="velocity").interpolate(Q_initial)
         p = Function(self._V_p, name="pressure").interpolate(p_initial)
@@ -115,7 +113,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
 
             # update velocity and pressure
             Q.assign(assemble(Q_hat - self._dt * dQp.sub(0)))
-            p += dQp.sub(1)
+            p += dQp.subfunctions[1]
             p -= assemble(p * dx)
             for callback in self.callbacks:
                 callback(Q, p, (k + 1) * self._dt)

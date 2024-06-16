@@ -472,8 +472,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         :arg T_final: final time
         :arg warmup: only perform a single timestep
         """
-        nt = 1 if warmup else int(T_final / self._dt)  # number of timesteps
-        assert nt * self._dt - T_final < 1.0e-12  # check that dt divides the final time
+        nt = self.get_timesteps(T_final, warmup)
         Q_0 = Function(self._V_Q).interpolate(Q_initial)
         p_0 = Function(self._V_p).interpolate(p_initial)
         p_0 -= assemble(p_0 * dx)

@@ -14,7 +14,15 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
     Chordin's projection method.
     """
 
-    def __init__(self, mesh, degree, dt, flux="upwind", use_projection_method=True):
+    def __init__(
+        self,
+        mesh,
+        degree,
+        dt,
+        flux="upwind",
+        use_projection_method=True,
+        callbacks=None,
+    ):
         """Initialise new instance
 
         :arg mesh: underlying mesh
@@ -22,11 +30,13 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(mesh, degree, dt, label="HDG Implicit")
         self.flux = flux
         assert self.flux in ["upwind", "centered"]
         self.use_projection_method = use_projection_method
+        self.callbacks = [] if callbacks is None else callbacks
         # penalty parameter
         self.alpha = 1
         # stabilisation parameter
@@ -38,7 +48,7 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         self._V_trace = FunctionSpace(self._mesh, "DGT", self.degree)
         self._V = self._V_Q * self._V_p * self._V_trace
 
-    def solve(self, Q_initial, p_initial, f_rhs, T_final):
+    def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 
         The solution is computed to the final time to T_final with nt timesteps; returns
@@ -48,11 +58,9 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         :arg p_initial: initial pressure, provided as an expression
         :arg f_rhs: function which returns an expression for a given time
         :arg T_final: final time
+        :arg warmup: perform warmup run (1 timestep only)
         """
-
-        nt = int(T_final / self._dt)  # number of timesteps
-        assert nt * self._dt - T_final < 1.0e-12  # check that dt divides the final time
-
+        nt = self.get_timesteps(T_final, warmup)
         u, phi, lmbda = TrialFunctions(self._V)
         w, psi, mu = TestFunctions(self._V)
 
@@ -60,11 +68,15 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         w_Q = TestFunction(self._V_Q)
 
         # Initial conditions
-        Q = Function(self._V_Q).interpolate(Q_initial)
-        p = Function(self._V_p).interpolate(p_initial)
+        Q = Function(self._V_Q, name="velocity").interpolate(Q_initial)
+        p = Function(self._V_p, name="pressure").interpolate(p_initial)
         p -= assemble(p * dx)
 
         n = FacetNormal(self._mesh)
+        for callback in self.callbacks:
+            callback.reset()
+            callback(Q, p, 0)
+
         # timestepping
         for k in tqdm.tqdm(range(nt)):
             # Step 1: Compute H(div)-conforming advection velocity
@@ -120,7 +132,7 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
 
                 # Step 2-c: update velocity
 
-                Q = assemble(Q_tentative + self._dt * Q_p_trace.sub(0))
+                Q.assign(assemble(Q_tentative + self._dt * Q_p_trace.sub(0)))
             else:
                 # Step 2: Compute velocity and pressure at next timestep
                 a_momentum = inner(u, w) * dx + self._dt * (
@@ -156,9 +168,12 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
                 a = a_momentum + a_flux + a_continuity
 
                 solve(a == b_rhs, Q_p_trace)
-                Q = Q_p_trace.sub(0)
+                Q.assign(Q_p_trace.subfunctions[0])
 
             # Step 3: update pressure
-            p = Q_p_trace.sub(1)
+            p.assign(Q_p_trace.subfunctions[1])
             p -= assemble(p * dx)
+            for callback in self.callbacks:
+                callback(Q, p, (k + 1) * self._dt)
+
         return Q, p

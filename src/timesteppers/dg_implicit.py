@@ -13,23 +13,25 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
     For details see Section 2.2 of Guzman et al. (2016).
     """
 
-    def __init__(self, mesh, degree, dt):
+    def __init__(self, mesh, degree, dt, callbacks=None):
         """Initialise new instance
 
         :arg mesh: underlying mesh
         :arg degree: polynomial degree of pressure space
         :arg dt: timestep size
+        :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(mesh, degree, dt, label="DG Implicit")
         # penalty parameter
         self.alpha = 1
+        self.callbacks = [] if callbacks is None else callbacks
 
         # function spaces for velocity, pressure and trace variables
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
         self._V_p = FunctionSpace(self._mesh, "DG", self.degree)
         self._V = self._V_Q * self._V_p
 
-    def solve(self, Q_initial, p_initial, f_rhs, T_final):
+    def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 
         The solution is computed to the final time to T_final with nt timesteps; returns
@@ -39,19 +41,20 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         :arg p_initial: initial pressure, provided as an expression
         :arg f_rhs: function which returns an expression for a given time
         :arg T_final: final time
+        :arg warmup: perform warmup run (1 timestep only)
         """
-
-        nt = int(T_final / self._dt)  # number of timesteps
-        assert nt * self._dt - T_final < 1.0e-12  # check that dt divides the final time
-
+        nt = self.get_timesteps(T_final, warmup)
         # Initial conditions
-        Q = Function(self._V_Q).interpolate(Q_initial)
-        p = Function(self._V_p).interpolate(p_initial)
+        Q = Function(self._V_Q, name="velocity").interpolate(Q_initial)
+        p = Function(self._V_p, name="pressure").interpolate(p_initial)
         p -= assemble(p * dx)
 
         n = FacetNormal(self._mesh)
         v, phi = TrialFunctions(self._V)
         w, psi = TestFunctions(self._V)
+        for callback in self.callbacks:
+            callback.reset()
+            callback(Q, p, 0)
 
         # timestepping
         for k in tqdm.tqdm(range(nt)):
@@ -94,6 +97,10 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
             Q_p = Function(self._V)
             solve(lhs == rhs, Q_p)
 
-            Q.assign(assemble(Q_p.sub(0)))
+            Q.assign(Q_p.subfunctions[0])
+            p.assign(Q_p.subfunctions[1])
             p -= assemble(p * dx)
+            for callback in self.callbacks:
+                callback(Q, p, (k + 1) * self._dt)
+
         return Q, p

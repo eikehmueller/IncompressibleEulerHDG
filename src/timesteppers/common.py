@@ -69,6 +69,16 @@ class IncompressibleEuler(ABC):
         with self.inverse_multiplicity.dat.vec as wv:
             wv.reciprocal()
 
+    def get_timesteps(self, t_final, warmup):
+        """Compute the number of timsteps
+
+        :arg t_final: final time
+        :arg warmup: perform a single timestep only
+        """
+        nt = 1 if warmup else int(t_final // self._dt)  # number of timesteps
+        assert nt * self._dt - t_final < 1.0e-12  # check that dt divides the final time
+        return nt
+
     @property
     def label(self):
         """Label of method"""
