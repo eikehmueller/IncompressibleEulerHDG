@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     # number of timesteps
     h_min, _ = gridspacing(mesh)
-    nt = int(np.ceil(args.tfinal / h_min))
+    nt = int(args.tfinal // h_min)
     # resulting timestep size
     dt = 1 / nt
     # decay constant, kappa=0 corresponds to stationary vortex
