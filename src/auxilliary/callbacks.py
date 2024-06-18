@@ -54,14 +54,19 @@ class AnimationCallback(Callback):
         degree = Q.function_space().ufl_element().degree()
         mesh = Q.function_space().mesh()
         V_vorticity = FunctionSpace(mesh, "CG", degree)
-        chi = TestFunction(V_vorticity)
-        psi = TrialFunction(V_vorticity)
-        xi = Function(V_vorticity, name="vorticity")
-        b_rhs = chi * curl(self.Q_proxy) * dx
-        a_project = chi * psi * dx
-        lvp = LinearVariationalProblem(a_project, b_rhs, xi)
+        tau = TestFunction(V_vorticity)
+        xi = TrialFunction(V_vorticity)
+        omega = Function(V_vorticity, name="vorticity")
+        epsilon = as_matrix([[0, +1], [-1, 0]])
+        n = FacetNormal(mesh)
+        b_rhs = (
+            -inner(epsilon, outer(grad(tau), self.Q_proxy)) * dx
+            + tau * inner(epsilon, outer(n, self.Q_proxy)) * ds
+        )
+        a_project = tau * xi * dx
+        lvp = LinearVariationalProblem(a_project, b_rhs, omega)
         lvs = LinearVariationalSolver(lvp)
-        return lvs, xi, self.Q_proxy
+        return lvs, omega, self.Q_proxy
 
     def __call__(self, Q, p, t):
         """Save velocity, pressure and vorticity fields to disk at a given time
@@ -70,7 +75,7 @@ class AnimationCallback(Callback):
         :arg p: pressure field at time t
         :arg t: time t
         """
-        lvs, xi, Q_ = self.vorticity_solver(Q)
+        lvs, omega, Q_ = self.vorticity_solver(Q)
         Q_.assign(Q)
         lvs.solve()
-        self.outfile.write(Q, p, xi, time=t)
+        self.outfile.write(Q, p, omega, time=t)
