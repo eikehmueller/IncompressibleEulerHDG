@@ -30,13 +30,48 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         self._V_Q = FunctionSpace(self._mesh, "RT", 1)
         self._V_p = FunctionSpace(self._mesh, "DG", 0)
         self._V = self._V_Q * self._V_p
-        self._Q_hat = Function(self._V_Q)
 
+        # mass solve (advection)
         v, phi = TrialFunctions(self._V)
         w, psi = TestFunctions(self._V)
 
+        self._Q = Function(self._V_Q, name="velocity")
+        self._p = Function(self._V_p, name="pressure")
+        self._f = Function(self._V_Q)
+        self._Q_p_hat = Function(self._V)
+        n = FacetNormal(self._mesh)
+        a_mass = inner(v, w) * dx + phi * psi * dx
+        if self.flux == "upwind":
+            advective_facet_flux = (
+                inner(self._Q("+"), n("+"))
+                * inner(self._Q("+") - self._Q("-"), avg(w))
+                * dS
+                - 1
+                / 2
+                * abs(inner(self._Q("+"), n("+")))
+                * inner(jump(self._Q), jump(w))
+                * dS
+            )
+        else:
+            advective_facet_flux = (
+                inner(2 * avg(inner(n, self._Q) * self._Q), avg(w)) * dS
+            )
+
+        b_rhs_mass = inner(self._Q, w) * dx + self._dt * (
+            inner(w, self._f) * dx
+            + self._p * div(w) * dx
+            - inner(outer(w, self._Q), grad(self._Q)) * dx
+            + advective_facet_flux
+        )
+        bcs = [DirichletBC(self._V.sub(0), as_vector([0, 0]), "on_boundary")]
+
+        lvp_mass = LinearVariationalProblem(a_mass, b_rhs_mass, self._Q_p_hat, bcs=bcs)
+        self.lvs_mass = LinearVariationalSolver(lvp_mass)
+
+        # mixed pressure solve
+
         a_mixed = inner(v, w) * dx + div(w) * phi * dx + div(v) * psi * dx
-        b_rhs_mixed = 1 / self._dt * div(self._Q_hat) * psi * dx
+        b_rhs_mixed = 1 / self._dt * div(self._Q_p_hat.subfunctions[0]) * psi * dx
         self._dQp = Function(self._V)
         nullspace = MixedVectorSpaceBasis(
             self._V,
@@ -66,53 +101,30 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         """
         nt = self.get_timesteps(T_final, warmup)
         # Initial conditions
-        Q = Function(self._V_Q, name="velocity").interpolate(Q_initial)
-        p = Function(self._V_p, name="pressure").interpolate(p_initial)
-        p -= assemble(p * dx)
+        self._Q.interpolate(Q_initial)
+        self._p.interpolate(p_initial)
+        self._p -= assemble(self._p * dx)
 
-        n = FacetNormal(self._mesh)
-        v, phi = TrialFunctions(self._V)
-        w, psi = TestFunctions(self._V)
         for callback in self.callbacks:
             callback.reset()
-            callback(Q, p, 0)
+            callback(self._Q, self._p, 0)
         # timestepping
         for k in tqdm.tqdm(range(nt)):
             # Stage 1: tentative velocity
-
-            n = FacetNormal(self._mesh)
-            a_mass = inner(v, w) * dx + phi * psi * dx
-            if self.flux == "upwind":
-                advective_facet_flux = (
-                    inner(Q("+"), n("+")) * inner(Q("+") - Q("-"), avg(w)) * dS
-                    - 1 / 2 * abs(inner(Q("+"), n("+"))) * inner(jump(Q), jump(w)) * dS
-                )
-            else:
-                advective_facet_flux = inner(2 * avg(inner(n, Q) * Q), avg(w)) * dS
-
-            f = Function(self._V_Q).interpolate(f_rhs(Constant(k * self._dt)))
-            b_rhs_mass = inner(Q, w) * dx + self._dt * (
-                inner(w, f) * dx
-                + p * div(w) * dx
-                - inner(outer(w, Q), grad(Q)) * dx
-                + advective_facet_flux
-            )
-
-            bcs = [DirichletBC(self._V.sub(0), as_vector([0, 0]), "on_boundary")]
-
-            Q_p_hat = Function(self._V)
-
-            solve(a_mass == b_rhs_mass, Q_p_hat, bcs=bcs)
+            self._f.interpolate(f_rhs(Constant(k * self._dt)))
+            self.lvs_mass.solve()
 
             # Stage 2: pressure correction
-
-            self._Q_hat.assign(Q_p_hat.subfunctions[0])
             self.lvs_mixed.solve()
 
             # update velocity and pressure
-            Q.assign(assemble(self._Q_hat - self._dt * self._dQp.subfunctions[0]))
-            p += self._dQp.subfunctions[1]
-            p -= assemble(p * dx)
+            self._Q.assign(
+                assemble(
+                    self._Q_p_hat.subfunctions[0] - self._dt * self._dQp.subfunctions[0]
+                )
+            )
+            self._p += self._dQp.subfunctions[1]
+            self._p -= assemble(self._p * dx)
             for callback in self.callbacks:
-                callback(Q, p, (k + 1) * self._dt)
-        return Q, p
+                callback(self._Q, self._p, (k + 1) * self._dt)
+        return self._Q, self._p
