@@ -30,6 +30,27 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         self._V_Q = FunctionSpace(self._mesh, "RT", 1)
         self._V_p = FunctionSpace(self._mesh, "DG", 0)
         self._V = self._V_Q * self._V_p
+        self._Q_hat = Function(self._V_Q)
+
+        v, phi = TrialFunctions(self._V)
+        w, psi = TestFunctions(self._V)
+
+        a_mixed = inner(v, w) * dx + div(w) * phi * dx + div(v) * psi * dx
+        b_rhs_mixed = 1 / self._dt * div(self._Q_hat) * psi * dx
+        self._dQp = Function(self._V)
+        nullspace = MixedVectorSpaceBasis(
+            self._V,
+            [
+                self._V.sub(0),
+                VectorSpaceBasis(constant=True, comm=COMM_WORLD),
+            ],
+        )
+        # homogeneous Dirichlet boundary conditions (zero normal derivative)
+        bcs_mixed = [DirichletBC(self._V.sub(0), as_vector([0, 0]), "on_boundary")]
+        lvp_mixed = LinearVariationalProblem(
+            a_mixed, b_rhs_mixed, self._dQp, bcs=bcs_mixed
+        )
+        self.lvs_mixed = LinearVariationalSolver(lvp_mixed, nullspace=nullspace)
 
     def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
@@ -58,10 +79,9 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         # timestepping
         for k in tqdm.tqdm(range(nt)):
             # Stage 1: tentative velocity
+
             n = FacetNormal(self._mesh)
-
             a_mass = inner(v, w) * dx + phi * psi * dx
-
             if self.flux == "upwind":
                 advective_facet_flux = (
                     inner(Q("+"), n("+")) * inner(Q("+") - Q("-"), avg(w)) * dS
@@ -84,36 +104,14 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
 
             solve(a_mass == b_rhs_mass, Q_p_hat, bcs=bcs)
 
-            Q_hat = Q_p_hat.sub(0)
-            p_hat = Q_p_hat.sub(1)
-
             # Stage 2: pressure correction
 
-            a_mixed = inner(v, w) * dx + div(w) * phi * dx + div(v) * psi * dx
-
-            b_rhs_mixed = 1 / self._dt * div(Q_hat) * psi * dx
-
-            dQp = Function(self._V)
-            nullspace = MixedVectorSpaceBasis(
-                self._V,
-                [
-                    self._V.sub(0),
-                    VectorSpaceBasis(constant=True, comm=COMM_WORLD),
-                ],
-            )
-
-            # homogeneous Dirichlet boundary conditions (zero normal derivative)
-            bcs = [DirichletBC(self._V.sub(0), as_vector([0, 0]), "on_boundary")]
-            solve(
-                a_mixed == b_rhs_mixed,
-                dQp,
-                bcs=bcs,
-                nullspace=nullspace,
-            )
+            self._Q_hat.assign(Q_p_hat.subfunctions[0])
+            self.lvs_mixed.solve()
 
             # update velocity and pressure
-            Q.assign(assemble(Q_hat - self._dt * dQp.sub(0)))
-            p += dQp.subfunctions[1]
+            Q.assign(assemble(self._Q_hat - self._dt * self._dQp.subfunctions[0]))
+            p += self._dQp.subfunctions[1]
             p -= assemble(p * dx)
             for callback in self.callbacks:
                 callback(Q, p, (k + 1) * self._dt)
