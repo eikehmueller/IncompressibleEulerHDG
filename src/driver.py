@@ -262,6 +262,8 @@ if __name__ == "__main__":
         print(f"mesh size = {args.nx} x {args.nx}")
         print(f"forcing = {args.forcing}")
         print(f"kappa = {kappa}")
+    elif args.problem == "shear":
+        print(f"mesh size = {args.nx} x {args.nx}")
     elif args.problem == "kelvinhelmholtz":
         print(f"mesh refinement = {args.refinement}")
     print(f"polynomial degree = {args.degree}")
