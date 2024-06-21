@@ -30,6 +30,41 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
         self._V_p = FunctionSpace(self._mesh, "DG", self.degree)
         self._V = self._V_Q * self._V_p
+        self._Q = Function(self._V_Q, name="velocity")
+        self._p = Function(self._V_p, name="pressure")
+        self._Q_star = Function(self.V_BDM)
+        self._f = Function(self._V_Q)
+        self._Q_p = Function(self._V)
+        # Assemble weak form for the n+1's step
+        n = FacetNormal(self._mesh)
+        v, phi = TrialFunctions(self._V)
+        w, psi = TestFunctions(self._V)
+
+        # Eq. (3.16) in Guzman et al. (2016), first equation
+        momentum_eq_lhs = inner(v, w) * dx + self._dt * (
+            inner(outer(w, self._Q_star), grad(v)) * dx
+            + self.alpha
+            * (
+                2.0 * avg(self._hF_inv) * avg(inner(v, n)) * 2.0 * avg(inner(w, n)) * dS
+                + self._hF_inv * inner(v, n) * inner(w, n) * ds
+            )
+            - inner(self._Q_star("+"), n("+")) * inner(jump(v), avg(w)) * dS
+            - phi * div(w) * dx
+            + 2.0 * avg(inner(w, n)) * avg(phi) * dS
+            + inner(n, w) * phi * ds
+        )
+
+        continuity_eq_lhs = (
+            psi * div(v) * dx
+            - 2 * avg(inner(v, n)) * avg(psi) * dS
+            - inner(v, n) * psi * ds
+        )
+
+        rhs = inner(self._Q, w) * dx + self._dt * inner(w, self._f) * dx
+        lvp = LinearVariationalProblem(
+            momentum_eq_lhs + continuity_eq_lhs, rhs, self._Q_p
+        )
+        self._lvs = LinearVariationalSolver(lvp)
 
     def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
@@ -45,62 +80,27 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         """
         nt = self.get_timesteps(T_final, warmup)
         # Initial conditions
-        Q = Function(self._V_Q, name="velocity").interpolate(Q_initial)
-        p = Function(self._V_p, name="pressure").interpolate(p_initial)
-        p -= assemble(p * dx)
+        self._Q.interpolate(Q_initial)
+        self._p.interpolate(p_initial)
+        self._p -= assemble(self._p * dx)
 
-        n = FacetNormal(self._mesh)
-        v, phi = TrialFunctions(self._V)
-        w, psi = TestFunctions(self._V)
         for callback in self.callbacks:
             callback.reset()
-            callback(Q, p, 0)
+            callback(self._Q, self._p, 0)
 
         # timestepping
         for k in tqdm.tqdm(range(nt)):
-            n = FacetNormal(self._mesh)
             # Star-velocity as projection to BDM
-            Q_star = self.project_bdm(Q)
-
-            # Assemble weak form for the n+1's step
-            # Eq. (3.16) in Guzman et al. (2016), first equation
-            momentum_eq_lhs = inner(v, w) * dx + self._dt * (
-                inner(outer(w, Q_star), grad(v)) * dx
-                + self.alpha
-                * (
-                    2.0
-                    * avg(self._hF_inv)
-                    * avg(inner(v, n))
-                    * 2.0
-                    * avg(inner(w, n))
-                    * dS
-                    + self._hF_inv * inner(v, n) * inner(w, n) * ds
-                )
-                - inner(Q_star("+"), n("+")) * inner(jump(v), avg(w)) * dS
-                - phi * div(w) * dx
-                + 2.0 * avg(inner(w, n)) * avg(phi) * dS
-                + inner(n, w) * phi * ds
-            )
-
-            continuity_eq_lhs = (
-                psi * div(v) * dx
-                - 2 * avg(inner(v, n)) * avg(psi) * dS
-                - inner(v, n) * psi * ds
-            )
-
-            lhs = momentum_eq_lhs + continuity_eq_lhs
-
-            f = Function(self._V_Q).interpolate(f_rhs(Constant(k * self._dt)))
-            rhs = inner(Q, w) * dx + self._dt * inner(w, f) * dx
+            self._Q_star.assign(self.project_bdm(self._Q))
 
             # Solve
-            Q_p = Function(self._V)
-            solve(lhs == rhs, Q_p)
+            self._f.interpolate(f_rhs(Constant(k * self._dt)))
+            self._lvs.solve()
 
-            Q.assign(Q_p.subfunctions[0])
-            p.assign(Q_p.subfunctions[1])
-            p -= assemble(p * dx)
+            self._Q.assign(self._Q_p.subfunctions[0])
+            self._p.assign(self._Q_p.subfunctions[1])
+            self._p -= assemble(self._p * dx)
             for callback in self.callbacks:
-                callback(Q, p, (k + 1) * self._dt)
+                callback(self._Q, self._p, (k + 1) * self._dt)
 
-        return Q, p
+        return self._Q, self._p
