@@ -148,7 +148,7 @@ if __name__ == "__main__":
     if args.problem == "taylorgreen":
         mesh = UnitSquareMesh(args.nx, args.nx, quadrilateral=False)
     elif args.problem == "shear":
-        mesh = PeriodicUnitSquareMesh(args.nx, args.nx, quadrilateral=False)
+        mesh = PeriodicSquareMesh(args.nx, args.nx, L=2 * np.pi, quadrilateral=False)
     elif args.problem == "kelvinhelmholtz":
         mesh = UnitDiskMesh(refinement_level=args.refinement)
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     h_min, _ = gridspacing(mesh)
     nt = int(args.tfinal // h_min)
     # resulting timestep size
-    dt = 1 / nt
+    dt = 0.04
     # decay constant, kappa=0 corresponds to stationary vortex
     kappa = 0.5
 

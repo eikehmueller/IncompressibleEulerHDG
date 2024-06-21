@@ -139,7 +139,7 @@ class DoubleLayerShearFlow(ModelProblem):
     IMA Journal of Numerical Analysis, 37(4), pp.1733-1771.
     """
 
-    def __init__(self, V_Q, V_p, rho=1 / 30, delta=0.05):
+    def __init__(self, V_Q, V_p, rho=np.pi / 15, delta=0.05):
         """Initialise new instance
 
         :arg V_Q: velocity function space
@@ -154,9 +154,11 @@ class DoubleLayerShearFlow(ModelProblem):
         self.Q_initial = as_vector(
             [
                 conditional(
-                    y <= 1 / 2, tanh((y - 1 / 4) / rho), tanh((3 / 4 - y) / rho)
+                    y <= pi,
+                    tanh((y - pi / 2) / rho),
+                    tanh((3 / 2 * pi - y) / rho),
                 ),
-                self.delta * sin(2 * pi * x),
+                self.delta * sin(x),
             ]
         )
 
@@ -180,10 +182,10 @@ class DoubleLayerShearFlow(ModelProblem):
             )[0]
             self.p_initial += (
                 fourier_coefficient
-                * sin((2 * k + 1) * (2 * y - 1) * pi)
+                * sin((2 * k + 1) * (y - pi))
                 / (1 + (2 * k + 1) ** 2)
             )
-        self.p_initial *= self.delta * cos(2 * pi * x)
+        self.p_initial *= self.delta * cos(x)
 
     def initial_condition(self):
         """Return initial condition"""
