@@ -13,7 +13,9 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
     For details see Section 2.1 of Guzman et al. (2016).
     """
 
-    def __init__(self, mesh, dt, flux="upwind", callbacks=None):
+    def __init__(
+        self, mesh, dt, flux="upwind", use_projection_method=True, callbacks=None
+    ):
         """Initialise new instance
 
         :arg mesh: underlying mesh
@@ -24,6 +26,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         super().__init__(mesh, 1, dt, label="Conforming Implicit")
         self.flux = flux
         assert self.flux in ["upwind", "centered"]
+        self._use_projection_method = use_projection_method
         self.callbacks = [] if callbacks is None else callbacks
 
         # function spaces for velocity, pressure and trace variables
@@ -57,7 +60,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
                 inner(2 * avg(inner(n, self._Q) * self._Q), avg(w)) * dS
             )
 
-        b_rhs_mass = inner(self._Q, w) * dx + self._dt * (
+        b_rhs_mass = inner(self._Q, w) * dx + Constant(self._dt) * (
             inner(w, self._f) * dx
             + self._p * div(w) * dx
             - inner(outer(w, self._Q), grad(self._Q)) * dx
@@ -71,7 +74,9 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         # mixed pressure solve
 
         a_mixed = inner(v, w) * dx + div(w) * phi * dx + div(v) * psi * dx
-        b_rhs_mixed = 1 / self._dt * div(self._Q_p_hat.subfunctions[0]) * psi * dx
+        b_rhs_mixed = (
+            Constant(1 / self._dt) * div(self._Q_p_hat.subfunctions[0]) * psi * dx
+        )
         self._dQp = Function(self._V)
         nullspace = MixedVectorSpaceBasis(
             self._V,
@@ -86,6 +91,35 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
             a_mixed, b_rhs_mixed, self._dQp, bcs=bcs_mixed
         )
         self.lvs_mixed = LinearVariationalSolver(lvp_mixed, nullspace=nullspace)
+
+        # full solve
+        self._Qp = Function(self._V)
+        advective_facet_flux = (
+            inner(self._Q("+"), n("+")) * inner(v("+") - v("-"), avg(w)) * dS
+        )
+        if self.flux == "upwind":
+            advective_facet_flux -= (
+                abs(inner(self._Q("+"), n("+")))
+                * inner(v("+") - v("-"), w("+") - w("-"))
+                * dS
+            )
+        a_monolithic = (
+            inner(v, w) * dx
+            + Constant(self._dt)
+            * (
+                inner(grad(self._Q), outer(v, w)) * dx
+                - advective_facet_flux
+                - phi * div(w) * dx
+            )
+            + psi * div(v) * dx
+        )
+        b_rhs_monolithic = inner(self._Q, w) * dx + inner(self._f, w) * dx
+        lvp_monolithic = LinearVariationalProblem(
+            a_monolithic, b_rhs_monolithic, self._Qp, bcs=bcs_mixed
+        )
+        self.lvs_monolithic = LinearVariationalSolver(
+            lvp_monolithic, nullspace=nullspace
+        )
 
     def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
@@ -112,18 +146,26 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         for k in tqdm.tqdm(range(nt)):
             # Stage 1: tentative velocity
             self._f.interpolate(f_rhs(Constant(k * self._dt)))
-            self.lvs_mass.solve()
+            if self._use_projection_method:
+                self.lvs_mass.solve()
 
-            # Stage 2: pressure correction
-            self.lvs_mixed.solve()
+                # Stage 2: pressure correction
+                self.lvs_mixed.solve()
 
-            # update velocity and pressure
-            self._Q.assign(
-                assemble(
-                    self._Q_p_hat.subfunctions[0] - self._dt * self._dQp.subfunctions[0]
+                # update velocity and pressure
+                self._Q.assign(
+                    assemble(
+                        self._Q_p_hat.subfunctions[0]
+                        - self._dt * self._dQp.subfunctions[0]
+                    )
                 )
-            )
-            self._p += self._dQp.subfunctions[1]
+                self._p += self._dQp.subfunctions[1]
+
+            else:
+                # Do monolithic solve
+                self.lvs_monolithic.solve()
+                self._Q.assign(self._Qp.subfunctions[0])
+                self._p.assign(self._Qp.subfunctions[1])
             self._p -= assemble(self._p * dx)
             for callback in self.callbacks:
                 callback(self._Q, self._p, (k + 1) * self._dt)

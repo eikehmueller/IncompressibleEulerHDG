@@ -165,14 +165,12 @@ if __name__ == "__main__":
     if args.discretisation == "conforming":
         # conforming discretisation
         print("Warning: ignoring degree for conforming method")
-        assert (
-            not args.use_projection_method
-        ), "Can not use projection method with conforming discretsation"
         if args.timestepper == "implicit":
             timestepper = IncompressibleEulerConformingImplicit(
                 mesh,
                 dt,
                 args.flux,
+                args.use_projection_method,
                 callbacks=callbacks,
             )
         else:
