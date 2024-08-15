@@ -113,7 +113,9 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
             )
             + psi * div(v) * dx
         )
-        b_rhs_monolithic = inner(self._Q, w) * dx + inner(self._f, w) * dx
+        b_rhs_monolithic = (
+            inner(self._Q, w) * dx + Constant(self._dt) * inner(self._f, w) * dx
+        )
         lvp_monolithic = LinearVariationalProblem(
             a_monolithic, b_rhs_monolithic, self._Qp, bcs=bcs_mixed
         )
