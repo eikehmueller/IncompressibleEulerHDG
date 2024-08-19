@@ -431,7 +431,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
 
         :arg state: state consisting of velocity, pressure and trace
         """
-        p_shift = assemble(state.subfunctions[1] * dx)
+        p_shift = assemble(state.subfunctions[1] * dx) / self.domain_volume
         state.subfunctions[1].assign(state.subfunctions[1] - p_shift)
         state.subfunctions[2].assign(state.subfunctions[2] - p_shift)
 
@@ -475,7 +475,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         nt = self.get_timesteps(T_final, warmup)
         Q_0 = Function(self._V_Q).interpolate(Q_initial)
         p_0 = Function(self._V_p).interpolate(p_initial)
-        p_0 -= assemble(p_0 * dx)
+        p_0 -= assemble(p_0 * dx) / self.domain_volume
         self._current_state.subfunctions[0].assign(Q_0)
         self._current_state.subfunctions[0].rename("Q")
         self._current_state.subfunctions[1].assign(p_0)

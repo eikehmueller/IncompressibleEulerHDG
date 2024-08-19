@@ -68,6 +68,9 @@ class IncompressibleEuler(ABC):
         par_loop((domain, instructions), dx, {"w": (self.inverse_multiplicity, INC)})
         with self.inverse_multiplicity.dat.vec as wv:
             wv.reciprocal()
+        # volume
+        V_DG0 = FunctionSpace(self._mesh, "DG", 0)
+        self.domain_volume = assemble(Function(V_DG0).interpolate(1) * dx)
 
     def get_timesteps(self, t_final, warmup):
         """Compute the number of timsteps

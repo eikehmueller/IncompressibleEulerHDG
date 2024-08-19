@@ -139,7 +139,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
         # Initial conditions
         self._Q.interpolate(Q_initial)
         self._p.interpolate(p_initial)
-        self._p -= assemble(self._p * dx)
+        self._p -= assemble(self._p * dx) / self.domain_volume
 
         for callback in self.callbacks:
             callback.reset()
@@ -168,7 +168,7 @@ class IncompressibleEulerConformingImplicit(IncompressibleEuler):
                 self.lvs_monolithic.solve()
                 self._Q.assign(self._Qp.subfunctions[0])
                 self._p.assign(self._Qp.subfunctions[1])
-            self._p -= assemble(self._p * dx)
+            self._p -= assemble(self._p * dx) / self.domain_volume
             for callback in self.callbacks:
                 callback(self._Q, self._p, (k + 1) * self._dt)
         return self._Q, self._p

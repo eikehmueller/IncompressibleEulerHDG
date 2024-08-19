@@ -70,7 +70,7 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         # Initial conditions
         Q = Function(self._V_Q, name="velocity").interpolate(Q_initial)
         p = Function(self._V_p, name="pressure").interpolate(p_initial)
-        p -= assemble(p * dx)
+        p -= assemble(p * dx) / self.domain_volume
 
         n = FacetNormal(self._mesh)
         for callback in self.callbacks:
@@ -172,7 +172,7 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
 
             # Step 3: update pressure
             p.assign(Q_p_trace.subfunctions[1])
-            p -= assemble(p * dx)
+            p -= assemble(p * dx) / self.domain_volume
             for callback in self.callbacks:
                 callback(Q, p, (k + 1) * self._dt)
 
