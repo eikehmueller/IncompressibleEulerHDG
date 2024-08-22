@@ -396,7 +396,7 @@ The resulting algorithm is shown in Alg. \ref{alg:imex_hdg}. Note that in the ca
         \State{\textbf{Step I}: Compute the tentative velocity $\overline{Q}$ by solving (cf. Eq. \eqref{eqn:tentative_velocity})
             \begin{equation}
                 \begin{aligned}
-                    (\overline{Q}\cdot w)_{\Omega_h} - a_{i,i}^\impl\Delta t\; f^\impl(w,Q,Q_{i-1}^\star) & = \delta r_i(w).
+                    (\overline{Q}\cdot w)_{\Omega_h} - a_{i,i}^\impl\Delta t\; f^\impl(w,\overline{Q},Q_{i-1}^\star) & = \delta r_i(w).
                 \end{aligned}
             \end{equation}
         }
