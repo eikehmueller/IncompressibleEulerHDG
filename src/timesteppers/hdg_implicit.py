@@ -45,10 +45,11 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         # function spaces for velocity, pressure and trace variables
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
         self._V_p = FunctionSpace(self._mesh, "DG", self.degree)
+        self._V_q = FunctionSpace(self._mesh, "DG", self.degree)
         self._V_trace = FunctionSpace(self._mesh, "DGT", self.degree)
         self._V = self._V_Q * self._V_p * self._V_trace
 
-    def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
+    def solve(self, Q_initial, p_initial, q_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 
         The solution is computed to the final time to T_final with nt timesteps; returns
@@ -56,6 +57,8 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
 
         :arg Q_initial: initial velocity, provided as an expression
         :arg p_initial: initial pressure, provided as an expression
+        :arg q_initial: initial tracer field, provided as an expression.
+                        Set to none to advect no tracer
         :arg f_rhs: function which returns an expression for a given time
         :arg T_final: final time
         :arg warmup: perform warmup run (1 timestep only)
@@ -67,6 +70,14 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         u_Q = TrialFunction(self._V_Q)
         w_Q = TestFunction(self._V_Q)
 
+        if q_initial:
+            q_tracer = Function(self._V_q, name="tracer").interpolate(q_initial)
+            chi = TestFunction(self._V_q)
+            sigma = TrialFunction(self._V_q)
+            a_tracer = chi * sigma * dx
+        else:
+            q_tracer = None
+
         # Initial conditions
         Q = Function(self._V_Q, name="velocity").interpolate(Q_initial)
         p = Function(self._V_p, name="pressure").interpolate(p_initial)
@@ -75,10 +86,14 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         n = FacetNormal(self._mesh)
         for callback in self.callbacks:
             callback.reset()
-            callback(Q, p, 0)
+            callback(Q, p, 0, q_tracer=q_tracer)
 
         # timestepping
         for k in tqdm.tqdm(range(nt)):
+            if q_tracer:
+                b_tracer = chi * q_tracer * dx + Constant(
+                    self._dt / 2
+                ) * self._tracer_advection(chi, q_tracer, Q, project_onto_cg=True)
             # Step 1: Compute H(div)-conforming advection velocity
             Q_star = self.project_bdm(Q)
             Q_p_trace = Function(self._V)
@@ -173,7 +188,13 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
             # Step 3: update pressure
             p.assign(Q_p_trace.subfunctions[1])
             p -= assemble(p * dx) / self.domain_volume
+            # advect tracer
+            if q_tracer:
+                b_tracer += Constant(self._dt / 2) * self._tracer_advection(
+                    chi, q_tracer, Q, project_onto_cg=True
+                )
+                solve(a_tracer == b_tracer, q_tracer)
             for callback in self.callbacks:
-                callback(Q, p, (k + 1) * self._dt)
+                callback(Q, p, (k + 1) * self._dt, q_tracer=q_tracer)
 
         return Q, p

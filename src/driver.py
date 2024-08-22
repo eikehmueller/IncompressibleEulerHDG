@@ -143,6 +143,13 @@ if __name__ == "__main__":
         help="save velocity and pressure fields at the end of each timestep as an animation",
     )
 
+    parser.add_argument(
+        "--tracer_advection",
+        action="store_true",
+        default=False,
+        help="advect tracer field",
+    )
+
     args = parser.parse_args()
 
     if args.problem == "taylorgreen":
@@ -156,7 +163,7 @@ if __name__ == "__main__":
     h_min, _ = gridspacing(mesh)
     nt = int(args.tfinal // h_min)
     # resulting timestep size
-    dt = 0.04
+    dt = 0.01
     # decay constant, kappa=0 corresponds to stationary vortex
     kappa = 0.5
 
@@ -273,6 +280,7 @@ if __name__ == "__main__":
     if type(timestepper) is IncompressibleEulerHDGIMEX:
         print(f"number of richardson iterations = {timestepper.n_richardson}")
     print(f"use projection method = {args.use_projection_method}")
+    print(f"advect tracer = {args.tracer_advection}")
     print(f"timestepping method = {timestepper.label}")
     print()
 
@@ -308,7 +316,14 @@ if __name__ == "__main__":
         model_problem = KelvinHelmholtz(timestepper._V_Q, timestepper._V_p)
 
     Q_0, p_0 = model_problem.initial_condition()
-    Q, p = timestepper.solve(Q_0, p_0, model_problem.f_rhs(), args.tfinal, args.warmup)
+    if args.tracer_advection:
+        x, y = SpatialCoordinate(mesh)
+        q_0 = sin(2 * pi * x) * sin(2 * pi * y)
+    else:
+        q_0 = None
+    Q, p = timestepper.solve(
+        Q_0, p_0, q_0, model_problem.f_rhs(), args.tfinal, warmup=args.warmup
+    )
 
     log_summary()
 

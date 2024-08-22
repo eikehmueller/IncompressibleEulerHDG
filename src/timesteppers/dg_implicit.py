@@ -29,6 +29,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         # function spaces for velocity, pressure and trace variables
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
         self._V_p = FunctionSpace(self._mesh, "DG", self.degree)
+        self._V_q = FunctionSpace(self._mesh, "DG", self.degree)
         self._V = self._V_Q * self._V_p
         self._Q = Function(self._V_Q, name="velocity")
         self._p = Function(self._V_p, name="pressure")
@@ -66,7 +67,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         )
         self._lvs = LinearVariationalSolver(lvp)
 
-    def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
+    def solve(self, Q_initial, p_initial, q_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 
         The solution is computed to the final time to T_final with nt timesteps; returns
@@ -74,6 +75,8 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
 
         :arg Q_initial: initial velocity, provided as an expression
         :arg p_initial: initial pressure, provided as an expression
+        :arg q_initial: initial tracer field, provided as an expression.
+                        Set to none to advect no tracer
         :arg f_rhs: function which returns an expression for a given time
         :arg T_final: final time
         :arg warmup: perform warmup run (1 timestep only)
@@ -83,13 +86,24 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         self._Q.interpolate(Q_initial)
         self._p.interpolate(p_initial)
         self._p -= assemble(self._p * dx)
+        if q_initial:
+            q_tracer = Function(self._V_q, name="tracer").interpolate(q_initial)
+            chi = TestFunction(self._V_q)
+            sigma = TrialFunction(self._V_q)
+            a_tracer = chi * sigma * dx
+        else:
+            q_tracer = None
 
         for callback in self.callbacks:
             callback.reset()
-            callback(self._Q, self._p, 0)
+            callback(self._Q, self._p, 0, q_tracer=q_tracer)
 
         # timestepping
         for k in tqdm.tqdm(range(nt)):
+            if q_tracer:
+                b_tracer = chi * q_tracer * dx + Constant(
+                    self._dt / 2
+                ) * self._tracer_advection(chi, q_tracer, self._Q, project_onto_cg=True)
             # Star-velocity as projection to BDM
             self._Q_star.assign(self.project_bdm(self._Q))
 
@@ -100,7 +114,12 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
             self._Q.assign(self._Q_p.subfunctions[0])
             self._p.assign(self._Q_p.subfunctions[1])
             self._p -= assemble(self._p * dx)
+            if q_tracer:
+                b_tracer += Constant(self._dt / 2) * self._tracer_advection(
+                    chi, q_tracer, self._Q, project_onto_cg=True
+                )
+                solve(a_tracer == b_tracer, q_tracer)
             for callback in self.callbacks:
-                callback(self._Q, self._p, (k + 1) * self._dt)
+                callback(self._Q, self._p, (k + 1) * self._dt, q_tracer=q_tracer)
 
         return self._Q, self._p

@@ -106,8 +106,29 @@ class IncompressibleEuler(ABC):
         bc.apply(Q_interpolate)
         return Q_interpolate
 
+    def _tracer_advection(self, chi, q, u, project_onto_cg=True):
+        """Passive tracer advection term
+
+        :arg chi: test function in tracer space
+        :arg q: tracer field
+        :arg u: advection velocity
+        :arg project_to_cg: project velocity onto CG space
+        """
+        n = FacetNormal(self._mesh)
+        if project_onto_cg:
+            degree = u.function_space().ufl_element().degree()
+            V_CG = VectorFunctionSpace(self._mesh, "CG", degree)
+            u_ = Function(V_CG).project(u)
+        else:
+            u_ = u
+        un = 1 / 2 * (inner(u_, n) + abs(inner(u_, n)))
+        return (
+            q * div(chi * u_) * dx
+            - (chi("+") - chi("-")) * (un("+") * q("+") - un("-") * q("-")) * dS
+        )
+
     @abstractmethod
-    def solve(self, Q_initial, p_initial, f_rhs, T_final):
+    def solve(self, Q_initial, p_initial, q_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 
         The solution is computed to the final time to T_final with nt timesteps; returns
@@ -115,6 +136,8 @@ class IncompressibleEuler(ABC):
 
         :arg Q_initial: initial velocity, provided as an expression
         :arg p_initial: initial pressure, provided as an expression
+        :arg q_initial: initial tracer field, provided as expression
         :arg f_rhs: function which returns an expression for a given time
         :arg T_final: final time
+        :arg warmup: perform warmup iteration?
         """

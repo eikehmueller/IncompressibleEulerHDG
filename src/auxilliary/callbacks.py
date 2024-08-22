@@ -68,14 +68,18 @@ class AnimationCallback(Callback):
         lvs = LinearVariationalSolver(lvp)
         return lvs, omega, self.Q_proxy
 
-    def __call__(self, Q, p, t):
+    def __call__(self, Q, p, t, q_tracer=None):
         """Save velocity, pressure and vorticity fields to disk at a given time
 
         :arg Q: velocity field at time t
         :arg p: pressure field at time t
         :arg t: time t
+        :arg q_tracer: passive tracer field at time t
         """
         lvs, omega, Q_ = self.vorticity_solver(Q)
         Q_.assign(Q)
         lvs.solve()
-        self.outfile.write(Q, p, omega, time=t)
+        fields = [Q, p, omega]
+        if q_tracer:
+            fields.append(q_tracer)
+        self.outfile.write(*fields, time=t)

@@ -62,6 +62,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         # function spaces for velocity, pressure and trace variables
         self._V_Q = VectorFunctionSpace(self._mesh, "DG", self.degree + 1)
         self._V_p = FunctionSpace(self._mesh, "DG", self.degree)
+        self._V_q = FunctionSpace(self._mesh, "DG", self.degree)
         self._V_trace = FunctionSpace(self._mesh, "DGT", self.degree)
         self._V = self._V_Q * self._V_p * self._V_trace
         self._V_BDM = FunctionSpace(self._mesh, "BDM", self.degree + 1)
@@ -74,9 +75,12 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         self._Q_tentative = []
         # RHS evaluated at intermediate stages
         self._b_rhs = []
+        # passive tracer
+        self._q = []
         for k in range(self.nstages):
             self._stage_state.append(Function(self._V))
             self._b_rhs.append(Function(self._V_Q))
+            self._q.append(Function(self._V_q))
             self._Q_tentative.append(Function(self._V_Q))
             if k < self.nstages - 1:
                 self._Qstar.append(Function(self._V_BDM))
@@ -405,6 +409,41 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 )
         return r_form
 
+    def _tracer_residual(self, chi, i):
+        """Compute passive tracer residual at stage i
+
+        :arg chi: test function in tracer space
+        :arg i: stage index
+        """
+        r_form = chi * self._q[0] * dx
+        for j in range(i):
+            if self._a_expl[i, j] != 0:
+                r_form += Constant(
+                    self._dt * self._a_expl[i, j]
+                ) * self._tracer_advection(
+                    chi,
+                    self._q[j],
+                    self._stage_state[i].subfunctions[0],
+                    project_onto_cg=True,
+                )
+        return r_form
+
+    def _tracer_final_residual(self, chi):
+        """Compute passive tracer residual at final stage
+
+        :arg chi: test function in tracer space
+        """
+        r_form = chi * self._q[0] * dx
+        for i in range(self.nstages):
+            if self._b_expl[i] != 0:
+                r_form += Constant(self._dt * self._b_expl[i]) * self._tracer_advection(
+                    chi,
+                    self._q[i],
+                    self._stage_state[i].subfunctions[0],
+                    project_onto_cg=True,
+                )
+        return r_form
+
     def _reconstruct_trace(self, state):
         """Reconstruct trace variable
 
@@ -460,7 +499,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         a_mass_inv_mat = a_mass_inv.M.handle
         return a_mass_inv_mat.matMult(a_proj_mat)
 
-    def solve(self, Q_initial, p_initial, f_rhs, T_final, warmup=False):
+    def solve(self, Q_initial, p_initial, q_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 
         The solution is computed to the final time to T_final with nt timesteps; returns
@@ -468,6 +507,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
 
         :arg Q_initial: initial velocity, provided as an expression
         :arg p_initial: initial pressure, provided as an expression
+        :arg q_initial: initial tracer field, provided as expression
+                        Set to "None" to disable tracer advection
         :arg f_rhs: function which returns an expression for a given time
         :arg T_final: final time
         :arg warmup: only perform a single timestep
@@ -476,6 +517,13 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         Q_0 = Function(self._V_Q).interpolate(Q_initial)
         p_0 = Function(self._V_p).interpolate(p_initial)
         p_0 -= assemble(p_0 * dx) / self.domain_volume
+        if q_initial:
+            q_tracer = Function(self._V_q, name="tracer").interpolate(q_initial)
+            chi = TestFunction(self._V_q)
+            sigma = TrialFunction(self._V_q)
+            a_tracer = chi * sigma * dx
+        else:
+            q_tracer = None
         self._current_state.subfunctions[0].assign(Q_0)
         self._current_state.subfunctions[0].rename("Q")
         self._current_state.subfunctions[1].assign(p_0)
@@ -493,6 +541,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 self._current_state.subfunctions[0],
                 self._current_state.subfunctions[1],
                 0,
+                q_tracer=q_tracer,
             )
         # loop over all timesteps
         for k in tqdm.tqdm(range(nt)):
@@ -504,6 +553,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         f_rhs(Constant(tn + self._c_expl[i] * self._dt))
                     )
                 self._stage_state[0].assign(self._current_state)
+                if q_tracer:
+                    self._q[0].assign(q_tracer)
                 # loop over stages 1,2,...,s-1
                 for i in range(1, self.nstages):
                     # compute Q*_{i-1}
@@ -565,6 +616,8 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                                 nullspace=self.nullspace,
                             )
                     self._shift_pressure(self._stage_state[i])
+                    if q_tracer:
+                        solve(a_tracer == self._tracer_residual(chi, i), self._q[i])
                 its = self.pressure_solve("final_stage")
                 # The solution of the mixed problem is stored in self._current_state
                 self.niter_final_pressure.update(its)
@@ -579,11 +632,14 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         self._pressure_reconstruction.subfunctions[idx]
                     )
                 self._shift_pressure(self._current_state)
+                if q_tracer:
+                    solve(a_tracer == self._tracer_final_residual(chi), q_tracer)
             for callback in self.callbacks:
                 callback(
                     self._current_state.subfunctions[0],
                     self._current_state.subfunctions[1],
                     tn + self._dt,
+                    q_tracer=q_tracer,
                 )
 
         print("average number of solver iterations")
