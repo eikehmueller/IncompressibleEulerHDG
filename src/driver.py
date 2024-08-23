@@ -70,6 +70,22 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--kappa",
+        type=float,
+        action="store",
+        default=0.5,
+        help="exponential decay factor",
+    )
+
+    parser.add_argument(
+        "--dt",
+        type=float,
+        action="store",
+        default=0.04,
+        help="timestep size",
+    )
+
+    parser.add_argument(
         "--discretisation",
         choices=["conforming", "dg", "hdg"],
         type=str,
@@ -159,14 +175,6 @@ if __name__ == "__main__":
     elif args.problem == "kelvinhelmholtz":
         mesh = UnitDiskMesh(refinement_level=args.refinement)
 
-    # number of timesteps
-    h_min, _ = gridspacing(mesh)
-    nt = int(args.tfinal // h_min)
-    # resulting timestep size
-    dt = 0.01
-    # decay constant, kappa=0 corresponds to stationary vortex
-    kappa = 0.5
-
     callbacks = [AnimationCallback("evolution.pvd")] if args.animation else None
 
     if args.discretisation == "conforming":
@@ -175,7 +183,7 @@ if __name__ == "__main__":
         if args.timestepper == "implicit":
             timestepper = IncompressibleEulerConformingImplicit(
                 mesh,
-                dt,
+                args.dt,
                 args.flux,
                 args.use_projection_method,
                 callbacks=callbacks,
@@ -191,7 +199,7 @@ if __name__ == "__main__":
         ), "Can not use projection method with DG discretsation"
         if args.timestepper == "implicit":
             timestepper = IncompressibleEulerDGImplicit(
-                mesh, args.degree, dt, callbacks=callbacks
+                mesh, args.degree, args.dt, callbacks=callbacks
             )
         else:
             raise RuntimeError(
@@ -203,7 +211,7 @@ if __name__ == "__main__":
             timestepper = IncompressibleEulerHDGImplicit(
                 mesh,
                 args.degree,
-                dt,
+                args.dt,
                 args.flux,
                 args.use_projection_method,
                 callbacks=callbacks,
@@ -212,7 +220,7 @@ if __name__ == "__main__":
             timestepper = IncompressibleEulerHDGIMEXARS2_232(
                 mesh,
                 args.degree,
-                dt,
+                args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
                 callbacks=callbacks,
@@ -221,7 +229,7 @@ if __name__ == "__main__":
             timestepper = IncompressibleEulerHDGIMEXARS3_443(
                 mesh,
                 args.degree,
-                dt,
+                args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
                 callbacks=callbacks,
@@ -230,7 +238,7 @@ if __name__ == "__main__":
             timestepper = IncompressibleEulerHDGIMEXSSP2_332(
                 mesh,
                 args.degree,
-                dt,
+                args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
                 callbacks=callbacks,
@@ -239,7 +247,7 @@ if __name__ == "__main__":
             timestepper = IncompressibleEulerHDGIMEXSSP3_433(
                 mesh,
                 args.degree,
-                dt,
+                args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
                 callbacks=callbacks,
@@ -248,7 +256,7 @@ if __name__ == "__main__":
             timestepper = IncompressibleEulerHDGIMEXImplicit(
                 mesh,
                 args.degree,
-                dt,
+                args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
                 callbacks=callbacks,
@@ -266,15 +274,14 @@ if __name__ == "__main__":
     if args.problem == "taylorgreen":
         print(f"mesh size = {args.nx} x {args.nx}")
         print(f"forcing = {args.forcing}")
-        print(f"kappa = {kappa}")
+        print(f"kappa = {args.kappa}")
     elif args.problem == "shear":
         print(f"mesh size = {args.nx} x {args.nx}")
     elif args.problem == "kelvinhelmholtz":
         print(f"mesh refinement = {args.refinement}")
     print(f"polynomial degree = {args.degree}")
     print(f"final time = {args.tfinal}")
-    print(f"number of timesteps = {nt}")
-    print(f"timestep size = {dt}")
+    print(f"timestep size = {args.dt}")
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
     if type(timestepper) is IncompressibleEulerHDGIMEX:
@@ -308,7 +315,7 @@ if __name__ == "__main__":
 
     if args.problem == "taylorgreen":
         model_problem = TaylorGreen(
-            timestepper._V_Q, timestepper._V_p, args.forcing, kappa
+            timestepper._V_Q, timestepper._V_p, args.forcing, args.kappa
         )
     elif args.problem == "shear":
         model_problem = DoubleLayerShearFlow(timestepper._V_Q, timestepper._V_p)
