@@ -102,7 +102,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         for k in tqdm.tqdm(range(nt)):
             if q_tracer:
                 b_tracer = chi * q_tracer * dx + Constant(
-                    self._dt / 2
+                    self._dt
                 ) * self._tracer_advection(chi, q_tracer, self._Q, project_onto_cg=True)
             # Star-velocity as projection to BDM
             self._Q_star.assign(self.project_bdm(self._Q))
@@ -115,9 +115,6 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
             self._p.assign(self._Q_p.subfunctions[1])
             self._p -= assemble(self._p * dx)
             if q_tracer:
-                b_tracer += Constant(self._dt / 2) * self._tracer_advection(
-                    chi, q_tracer, self._Q, project_onto_cg=True
-                )
                 solve(a_tracer == b_tracer, q_tracer)
             for callback in self.callbacks:
                 callback(self._Q, self._p, (k + 1) * self._dt, q_tracer=q_tracer)

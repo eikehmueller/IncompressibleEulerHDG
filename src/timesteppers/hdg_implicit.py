@@ -92,7 +92,7 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
         for k in tqdm.tqdm(range(nt)):
             if q_tracer:
                 b_tracer = chi * q_tracer * dx + Constant(
-                    self._dt / 2
+                    self._dt
                 ) * self._tracer_advection(chi, q_tracer, Q, project_onto_cg=True)
             # Step 1: Compute H(div)-conforming advection velocity
             Q_star = self.project_bdm(Q)
@@ -190,9 +190,6 @@ class IncompressibleEulerHDGImplicit(IncompressibleEuler):
             p -= assemble(p * dx) / self.domain_volume
             # advect tracer
             if q_tracer:
-                b_tracer += Constant(self._dt / 2) * self._tracer_advection(
-                    chi, q_tracer, Q, project_onto_cg=True
-                )
                 solve(a_tracer == b_tracer, q_tracer)
             for callback in self.callbacks:
                 callback(Q, p, (k + 1) * self._dt, q_tracer=q_tracer)
