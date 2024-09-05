@@ -13,15 +13,18 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
     For details see Section 2.2 of Guzman et al. (2016).
     """
 
-    def __init__(self, mesh, degree, dt, callbacks=None):
+    def __init__(self, mesh, degree, dt, flux="upwind", callbacks=None):
         """Initialise new instance
 
         :arg mesh: underlying mesh
         :arg degree: polynomial degree of pressure space
         :arg dt: timestep size
+        :arg flux: numerical flux ("upwind" or "centered")
         :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(mesh, degree, dt, label="DG Implicit")
+        assert flux in ["upwind", "centered"]
+        self.flux = flux
         # penalty parameter
         self.alpha = 1
         self.callbacks = [] if callbacks is None else callbacks
@@ -54,6 +57,12 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
             + 2.0 * avg(inner(w, n)) * avg(phi) * dS
             + inner(n, w) * phi * ds
         )
+        if self.flux == "upwind":
+            momentum_eq_lhs += self._dt * (
+                abs(inner(self._Q_star("+"), n("+")))
+                * inner(v("+") - v("-"), w("+") - w("-"))
+                * dS
+            )
 
         continuity_eq_lhs = (
             psi * div(v) * dx

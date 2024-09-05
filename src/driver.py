@@ -199,7 +199,7 @@ if __name__ == "__main__":
         ), "Can not use projection method with DG discretsation"
         if args.timestepper == "implicit":
             timestepper = IncompressibleEulerDGImplicit(
-                mesh, args.degree, args.dt, callbacks=callbacks
+                mesh, args.degree, args.dt, flux=args.flux, callbacks=callbacks
             )
         else:
             raise RuntimeError(
