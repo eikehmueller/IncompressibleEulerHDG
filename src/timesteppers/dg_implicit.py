@@ -94,7 +94,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         # Initial conditions
         self._Q.interpolate(Q_initial)
         self._p.interpolate(p_initial)
-        self._p -= assemble(self._p * dx)
+        self._p.assign(self._p - assemble(self._p * dx) / self.domain_volume)
         if q_initial:
             q_tracer = Function(self._V_q, name="tracer").interpolate(q_initial)
             chi = TestFunction(self._V_q)
@@ -122,7 +122,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
 
             self._Q.assign(self._Q_p.subfunctions[0])
             self._p.assign(self._Q_p.subfunctions[1])
-            self._p -= assemble(self._p * dx)
+            self._p.assign(self._p - assemble(self._p * dx) / self.domain_volume)
             if q_tracer:
                 solve(a_tracer == b_tracer, q_tracer)
             for callback in self.callbacks:
