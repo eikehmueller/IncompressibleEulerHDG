@@ -74,7 +74,12 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         lvp = LinearVariationalProblem(
             momentum_eq_lhs + continuity_eq_lhs, rhs, self._Q_p
         )
-        self._lvs = LinearVariationalSolver(lvp)
+        solver_parameters = {
+            "ksp_type": "gmres",
+            "pc_type": "lu",
+            "pc_factor_mat_solver_type": "mumps",
+        }
+        self._lvs = LinearVariationalSolver(lvp, solver_parameters=solver_parameters)
 
     def solve(self, Q_initial, p_initial, q_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
