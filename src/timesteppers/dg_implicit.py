@@ -45,7 +45,7 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
         w, psi = TestFunctions(self._V)
 
         # Eq. (3.16) in Guzman et al. (2016), first equation
-        momentum_eq_lhs = inner(v, w) * dx + self._dt * (
+        momentum_eq_lhs = inner(v, w) * dx + Constant(self._dt) * (
             inner(outer(w, self._Q_star), grad(v)) * dx
             + self.alpha
             * (
@@ -58,13 +58,13 @@ class IncompressibleEulerDGImplicit(IncompressibleEuler):
             + inner(n, w) * phi * ds
         )
         if self.flux == "upwind":
-            momentum_eq_lhs += self._dt * (
+            momentum_eq_lhs += Constant(self._dt) * (
                 abs(inner(self._Q_star("+"), n("+")))
                 * inner(v("+") - v("-"), w("+") - w("-"))
                 * dS
             )
 
-        continuity_eq_lhs = (
+        continuity_eq_lhs = Constant(self._dt) * (
             psi * div(v) * dx
             - 2 * avg(inner(v, n)) * avg(psi) * dS
             - inner(v, n) * psi * ds
