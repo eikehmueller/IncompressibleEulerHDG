@@ -78,8 +78,9 @@ class IncompressibleEuler(ABC):
         :arg t_final: final time
         :arg warmup: perform a single timestep only
         """
-        nt = 1 if warmup else int(t_final // self._dt)  # number of timesteps
-        assert nt * self._dt - t_final < 1.0e-12  # check that dt divides the final time
+        nt = 1 if warmup else int(np.round(t_final / self._dt))  # number of timesteps
+        # check that dt divides the final time
+        assert abs(nt * self._dt - t_final) < 1.0e-12
         return nt
 
     @property
