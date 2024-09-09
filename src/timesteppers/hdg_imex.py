@@ -983,10 +983,17 @@ class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
 
     @property
     def _a_impl(self):
-        """4 x 4 matrix with implicit coefficients for intermediate stages"""
-        alpha = 0.2416942608
-        beta = 0.0604235652
-        eta = 0.1291528696
+        """4 x 4 matrix with implicit coefficients for intermediate stages
+
+        Constants for a_impl are taken from from:
+
+            Pareschi, L. and Russo, G., 2005. "Implicit–explicit Runge–Kutta schemes
+            and applications to hyperbolic systems with relaxation."
+            Journal of Scientific computing, 25, pp.129-155.
+        """
+        alpha = 0.24169426078821
+        beta = 0.06042356519705
+        eta = 0.12915286960590
         delta = 1 / 2 - alpha - beta - eta
         return np.asarray(
             [
