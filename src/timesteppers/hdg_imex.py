@@ -499,6 +499,26 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         a_mass_inv_mat = a_mass_inv.M.handle
         return a_mass_inv_mat.matMult(a_proj_mat)
 
+    def test_pressure_reconstruction(self, Q, f_rhs, t):
+        """Test the pressure reconstruction from velocity
+
+        For a given velocity Q (given as an analytical expression) and forcing f_rhs (given as a function),
+        reconstruct the corresponding pressure at the same time.
+
+        :arg Q: velocity
+        :arg f_rhs: right hand side forcing function
+        :arg t: time at which to perform the test
+        """
+        self._current_state.subfunctions[0].interpolate(Q)
+        self._b_new.interpolate(f_rhs(Constant(t)))
+        self.pressure_solve("pressure_reconstruction")
+        for idx in (1, 2):
+            self._current_state.subfunctions[idx].assign(
+                self._pressure_reconstruction.subfunctions[idx]
+            )
+        self._shift_pressure(self._current_state)
+        return self._current_state.subfunctions[0], self._current_state.subfunctions[1]
+
     def solve(self, Q_initial, p_initial, q_initial, f_rhs, T_final, warmup=False):
         """Propagate solution forward in time for a given initial velocity and pressure
 

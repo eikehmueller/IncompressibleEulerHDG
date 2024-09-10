@@ -166,6 +166,13 @@ if __name__ == "__main__":
         help="advect tracer field",
     )
 
+    parser.add_argument(
+        "--test_pressure_reconstruction",
+        action="store_true",
+        default=False,
+        help="test pressure reconstruction from velocity",
+    )
+
     args = parser.parse_args()
 
     if args.problem == "taylorgreen":
@@ -328,9 +335,23 @@ if __name__ == "__main__":
         q_0 = sin(2 * pi * x) * sin(2 * pi * y)
     else:
         q_0 = None
-    Q, p = timestepper.solve(
-        Q_0, p_0, q_0, model_problem.f_rhs(), args.tfinal, warmup=args.warmup
-    )
+    if args.test_pressure_reconstruction:
+        exact_solution = model_problem.solution(args.tfinal)
+        if exact_solution is not None:
+            print(
+                f"WARNING: testing pressure reconstruction. No time-integration is performed!"
+            )
+            print("")
+            Q_exact, _ = exact_solution
+            Q, p = timestepper.test_pressure_reconstruction(
+                Q_exact, model_problem.f_rhs(), args.tfinal
+            )
+        else:
+            raise RuntimeError(f"problem '{args.problem}' does not have exact solution")
+    else:
+        Q, p = timestepper.solve(
+            Q_0, p_0, q_0, model_problem.f_rhs(), args.tfinal, warmup=args.warmup
+        )
 
     log_summary()
 
