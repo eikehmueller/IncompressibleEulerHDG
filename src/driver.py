@@ -306,8 +306,7 @@ if __name__ == "__main__":
     print(f"timestep size = {args.dt}")
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
-    if type(timestepper) is IncompressibleEulerHDGIMEX and args.use_projection_method:
-        print(f"number of Richardson iterations = {args.richardson}")
+    print(f"number of Richardson iterations = {args.richardson}")
     print(f"use projection method = {args.use_projection_method}")
     print(f"advect tracer = {args.tracer_advection}")
     print(f"timestepping method = {timestepper.label}")
