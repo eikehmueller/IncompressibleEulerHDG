@@ -102,6 +102,15 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--richardson",
+        metavar="richardson",
+        type=int,
+        action="store",
+        default=2,
+        help="number of Richardson iterations",
+    )
+
+    parser.add_argument(
         "--flux",
         choices=["upwind", "centered"],
         type=str,
@@ -212,8 +221,9 @@ if __name__ == "__main__":
                 mesh,
                 args.degree,
                 args.dt,
-                args.flux,
-                args.use_projection_method,
+                flux=args.flux,
+                use_projection_method=args.use_projection_method,
+                n_richardson=args.richardson,
                 callbacks=callbacks,
             )
         elif args.timestepper == "imex_ars2_232":
@@ -223,6 +233,7 @@ if __name__ == "__main__":
                 args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                n_richardson=args.richardson,
                 callbacks=callbacks,
             )
         elif args.timestepper == "imex_ars3_443":
@@ -232,6 +243,7 @@ if __name__ == "__main__":
                 args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                n_richardson=args.richardson,
                 callbacks=callbacks,
             )
         elif args.timestepper == "imex_ssp2_332":
@@ -241,6 +253,7 @@ if __name__ == "__main__":
                 args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                n_richardson=args.richardson,
                 callbacks=callbacks,
             )
         elif args.timestepper == "imex_ssp3_433":
@@ -250,6 +263,7 @@ if __name__ == "__main__":
                 args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                n_richardson=args.richardson,
                 callbacks=callbacks,
             )
         elif args.timestepper == "imex_implicit":
@@ -259,6 +273,7 @@ if __name__ == "__main__":
                 args.dt,
                 flux=args.flux,
                 use_projection_method=args.use_projection_method,
+                n_richardson=args.richardson,
                 callbacks=callbacks,
             )
         else:
@@ -284,8 +299,8 @@ if __name__ == "__main__":
     print(f"timestep size = {args.dt}")
     print(f"discretisation = {args.discretisation}")
     print(f"numerical flux = {args.flux}")
-    if type(timestepper) is IncompressibleEulerHDGIMEX:
-        print(f"number of richardson iterations = {timestepper.n_richardson}")
+    if type(timestepper) is IncompressibleEulerHDGIMEX and args.use_projection_method:
+        print(f"number of Richardson iterations = {args.richardson}")
     print(f"use projection method = {args.use_projection_method}")
     print(f"advect tracer = {args.tracer_advection}")
     print(f"timestepping method = {timestepper.label}")

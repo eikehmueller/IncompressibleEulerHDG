@@ -33,6 +33,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         dt,
         flux="upwind",
         use_projection_method=True,
+        n_richardson=2,
         label=None,
         callbacks=None,
     ):
@@ -43,6 +44,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg n_richardson: number of Richardson iterations
         :arg label: name of timestepping method
         :arg callbacks: callbacks to invoke at the end of each timestep
         """
@@ -55,7 +57,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         # stabilisation parameter
         self.tau = 1
         # number of Richardson iterations
-        self.n_richardson = 2
+        self.n_richardson = n_richardson
         # callbacks class
         self.callbacks = [] if callbacks is None else callbacks
 
@@ -672,6 +674,7 @@ class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
         dt,
         flux="upwind",
         use_projection_method=True,
+        n_richardson=2,
         callbacks=None,
     ):
         """Initialise new instance
@@ -681,6 +684,7 @@ class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg n_richardson: number of Richardson iterations
         :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
@@ -689,6 +693,7 @@ class IncompressibleEulerHDGIMEXImplicit(IncompressibleEulerHDGIMEX):
             dt,
             flux,
             use_projection_method,
+            n_richardson,
             label="HDG IMEX Implicit",
             callbacks=callbacks,
         )
@@ -733,6 +738,7 @@ class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
         dt,
         flux="upwind",
         use_projection_method=True,
+        n_richardson=2,
         callbacks=None,
     ):
         """Initialise new instance
@@ -742,6 +748,7 @@ class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg n_richardson: number of Richardson iterations
         :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
@@ -750,6 +757,7 @@ class IncompressibleEulerHDGIMEXARS2_232(IncompressibleEulerHDGIMEX):
             dt,
             flux,
             use_projection_method,
+            n_richardson,
             label="HDG IMEX ARS2(2,3,2)",
             callbacks=callbacks,
         )
@@ -800,6 +808,7 @@ class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
         dt,
         flux="upwind",
         use_projection_method=True,
+        n_richardson=2,
         callbacks=None,
     ):
         """Initialise new instance
@@ -809,6 +818,7 @@ class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg n_richardson: number of Richardson iterations
         :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
@@ -817,6 +827,7 @@ class IncompressibleEulerHDGIMEXARS3_443(IncompressibleEulerHDGIMEX):
             dt,
             flux,
             use_projection_method,
+            n_richardson,
             label="HDG IMEX ARS3(4,4,3)",
             callbacks=callbacks,
         )
@@ -877,6 +888,7 @@ class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
         dt,
         flux="upwind",
         use_projection_method=True,
+        n_richardson=2,
         callbacks=None,
     ):
         """Initialise new instance
@@ -886,6 +898,7 @@ class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg n_richardson: number of Richardson iterations
         :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
@@ -894,6 +907,7 @@ class IncompressibleEulerHDGIMEXSSP2_332(IncompressibleEulerHDGIMEX):
             dt,
             flux,
             use_projection_method,
+            n_richardson,
             label="HDG IMEX SSP2(3,3,2)",
             callbacks=callbacks,
         )
@@ -944,6 +958,7 @@ class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
         dt,
         flux="upwind",
         use_projection_method=True,
+        n_richardson=2,
         callbacks=None,
     ):
         """Initialise new instance
@@ -953,6 +968,7 @@ class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
         :arg dt: timestep size
         :arg flux: numerical flux to use, either "upwind" or "centered"
         :arg use_projection_method: use projection method instead of monolithic solve
+        :arg n_richardson: number of Richardson iterations
         :arg callbacks: callbacks to invoke at the end of each timestep
         """
         super().__init__(
@@ -961,6 +977,7 @@ class IncompressibleEulerHDGIMEXSSP3_433(IncompressibleEulerHDGIMEX):
             dt,
             flux,
             use_projection_method,
+            n_richardson,
             label="HDG IMEX SSP3(4,3,3)",
             callbacks=callbacks,
         )
