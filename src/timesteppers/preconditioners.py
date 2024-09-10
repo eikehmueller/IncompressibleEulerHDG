@@ -95,7 +95,7 @@ class PCProjection(PCBase):
         self.domain_volume = assemble(Function(V_DG0).interpolate(1) * dx)
 
     def apply(self, pc, x, y):
-         """Apply the preconditioner.
+        """Apply the preconditioner.
 
         :arg pc: a Preconditioner instance.
         :arg x: A PETSc vector containing the incoming right-hand side.
