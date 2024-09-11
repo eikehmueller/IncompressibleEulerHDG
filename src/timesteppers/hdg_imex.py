@@ -130,7 +130,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
             "ksp_type": "preonly",
             "pc_type": "python",
             "pc_python_type": "firedrake.SCPC",
-            "pc_sc_eliminate_fields": "0, 1",
+            "pc_sc_eliminate_fields": "0,1",
             "condensed_field": {
                 "mat_type": "aij",
                 "ksp_type": "gmres",
@@ -170,10 +170,12 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         }
 
         self._solver_mixed_poisson = dict()
+        self._solver_unsplit = dict()
         # intermediate stages
         self._update = Function(self._V)
         self._current_state = Function(self._V)
         for i in range(1, self.nstages):
+            # mixed poisson
             b_rhs_mixed_poisson = Constant(
                 -1 / (self._a_impl[i, i] * self._dt)
             ) * self._weak_divergence(psi, self._Q_tentative[i])
@@ -186,6 +188,42 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                 nullspace=self.nullspace,
                 appctx=appctx,
             )
+            # unsplit solver
+            a_unsplit = (
+                inner(w, u) * dx
+                - Constant(self._a_impl[i, i] * self._dt)
+                * (
+                    self._pressure_gradient(w, phi, lmbda)
+                    + self._f_impl(w, u, self._Qstar[i - 1])
+                )
+                + self._Gamma(psi, mu, u, phi, lmbda)
+            )
+            b_rhs_unsplit = self._residual(w, i)
+            problem_unsplit = LinearVariationalProblem(
+                a_unsplit, b_rhs_unsplit, self._stage_state[i]
+            )
+            self._solver_unsplit[f"stage_{i:d}"] = LinearVariationalSolver(
+                problem_unsplit,
+                solver_parameters={
+                    "ksp_type": "gmres",
+                    "ksp_rtol": 1e-9,
+                    "pc_type": "python",
+                    "mat_type": "matfree",
+                    "pc_python_type": "timesteppers.preconditioners.PCProjection",
+                    "projection": {
+                        "dt": self._dt * self._a_impl[i, i],
+                        "tau": self.tau,
+                        "velocity": {
+                            "ksp_type": "gmres",
+                            "pc_type": "ilu",
+                        },
+                        "pressure": solver_parameters,
+                    },
+                },
+                nullspace=self.nullspace,
+                appctx=appctx,
+            )
+
         # final stage
         problem_mixed_poisson = LinearVariationalProblem(
             a_mixed_poisson, self._final_residual(w), self._current_state
@@ -586,8 +624,24 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                         )
                     if self.use_projection_method:
                         # Richardson iteration
-                        for _ in range(self.n_richardson):
+                        print("Richardson iteration:")
+                        for ell in range(self.n_richardson):
                             # Compute residual
+                            w_Q = TestFunction(self._V_Q)
+                            Q_i = self._stage_state[i].subfunctions[0]
+                            p_i = self._stage_state[i].subfunctions[1]
+                            lambda_i = self._stage_state[i].subfunctions[2]
+                            b_rhs_tentative = assemble(
+                                self._residual(w_Q, i)
+                                - inner(w_Q, Q_i) * dx
+                                + Constant(self._a_impl[i, i] * self._dt)
+                                * (
+                                    self._f_impl(w_Q, Q_i, self._Qstar[i - 1])
+                                    + self._pressure_gradient(w_Q, p_i, lambda_i)
+                                )
+                            )
+                            nrm = np.linalg.norm(b_rhs_tentative.dat.data)
+                            print(f"{ell:2d} : {nrm:8.3e}")
                             its = self.tentative_velocity_solve(f"stage_{i:d}")
                             self.niter_tentative.update(its)
                             # step 2: compute (hybridised) pressure and velocity increment
@@ -618,25 +672,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                             )
                     else:
                         with PerformanceLog("unsplit_solve"):
-                            a_implicit = (
-                                inner(w, u) * dx
-                                - Constant(self._a_impl[i, i] * self._dt)
-                                * (
-                                    self._pressure_gradient(w, phi, lmbda)
-                                    + self._f_impl(w, u, self._Qstar[i - 1])
-                                )
-                                + self._Gamma(psi, mu, u, phi, lmbda)
-                            )
-                            solve(
-                                a_implicit == self._residual(w, i),
-                                self._stage_state[i],
-                                solver_parameters={
-                                    "ksp_type": "gmres",
-                                    "pc_type": "lu",
-                                    "pc_factor_mat_solver_type": "mumps",
-                                },
-                                nullspace=self.nullspace,
-                            )
+                            self._solver_unsplit[f"stage_{i:d}"].solve()
                     self._shift_pressure(self._stage_state[i])
                     if q_tracer:
                         solve(a_tracer == self._tracer_residual(chi, i), self._q[i])
