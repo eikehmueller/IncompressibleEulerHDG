@@ -4,6 +4,7 @@ from firedrake import *
 
 __all__ = ["PCProjection"]
 
+
 class PCProjection(PCBase):
     """Preconditioner for timestep update based on the projection method
 
@@ -48,11 +49,11 @@ class PCProjection(PCBase):
         self.ctx = P.getPythonContext()
         if not isinstance(self.ctx, matrix_free.operators.ImplicitMatrixContext):
             raise ValueError("The python context must be an ImplicitMatrixContext")
-        test, _ = self.ctx.a.arguments()
-        V = test.function_space()
+        bilinear_form = self.ctx.a
+        V = bilinear_form.arguments()[0].function_space()
         self._mesh = V.mesh()
         self._ises = V._ises
-        Pmat = assemble(self.ctx.a).petscmat
+        Pmat = assemble(bilinear_form).petscmat
         # Extract matrix for tentative velocity solve, this is nothing but
         # the upper left block of the entire system
         A_QQ = Pmat.createSubMatrix(self._ises[0], self._ises[0])
@@ -76,9 +77,11 @@ class PCProjection(PCBase):
             + self._Gamma(psi, mu, u, p, lmbda)
         )
 
-        b_mixed = Constant(1 / self.dt) * self._weak_divergence(psi, self.Q_tentative)
-        self.update = Function(V)
-        lvp_pressure = LinearVariationalProblem(a_mixed, b_mixed, self.update)
+        self.residual = Cofunction(V_Q.dual())
+
+        b_mixed = Constant(-1 / self.dt) * self._weak_divergence(psi, self.Q_tentative)
+        self.solution = Function(V)
+        lvp_pressure = LinearVariationalProblem(a_mixed, b_mixed, self.solution)
         # Construct nullspace
         z = Function(V)
         z.subfunctions[0].interpolate(as_vector([Constant(0), Constant(0)]))
@@ -101,27 +104,28 @@ class PCProjection(PCBase):
         :arg x: A PETSc vector containing the incoming right-hand side.
         :arg y: A PETSc vector for the result.
         """
-        r_Q = x.getSubVector(self._ises[0])
-        Q = y.getSubVector(self._ises[0])
-        p = y.getSubVector(self._ises[1])
-        lmbda = y.getSubVector(self._ises[2])
         # Step 1: compute tentative velocity
-        self._velocity_ksp.solve(r_Q, Q)
-        self.Q_tentative.dat.data[:] = Q[:]
+        r_Q = x.getSubVector(self._ises[0])
+        with self.Q_tentative.dat.vec as v:
+            self._velocity_ksp.solve(r_Q, v)
+        # Step 2: solve mixed system for pressure
         self.lvs_pressure.solve()
-        p_shift = assemble(self.update.subfunctions[1] * dx) / self.domain_volume
-        self.update.subfunctions[1].assign(self.update.subfunctions[1] - p_shift)
-        self.update.subfunctions[2].assign(self.update.subfunctions[2] - p_shift)
-        Q[:] = (
-            self.Q_tentative.dat.data + self.dt * self.update.subfunctions[0].dat.data
-        )[:]
-        p[:] = self.update.subfunctions[1].dat.data[:]
-        lmbda[:] = self.update.subfunctions[2].dat.data[:]
-        y.restoreSubVector(self._ises[0], Q)
-        y.restoreSubVector(self._ises[1], p)
-        y.restoreSubVector(self._ises[2], lmbda)
+        # Step 3: assign solution
+        #   Q      = Q_tentative + dt * Q'
+        #   p      = p' - (p')_Omega
+        #   lambda = lambda' - (p')_Omega
+        Q, p, lmbda = self.solution.subfunctions
+        Q.assign(self.Q_tentative + self.dt * Q)
+        # shift the pressure to ensure that it integrates to zero
+        p_shift = assemble(p * dx) / self.domain_volume
+        p.assign(p - p_shift)
+        lmbda.assign(lmbda - p_shift)
+        # Copy out solutions
+        with self.solution.dat.vec_ro as w:
+            w.copy(y)
 
     def update(self, pc):
+        """Update preconditioner"""
         pass
 
     def applyTranspose(self, pc, x, y):
@@ -137,6 +141,8 @@ class PCProjection(PCBase):
     def view(self, pc, viewer=None):
         """Viewer KSPs of tentative-velocity and mixed pressure system"""
         super().view(pc, viewer)
+        viewer.printfASCII(f"dt = {self.dt}\n")
+        viewer.printfASCII(f"tau = {self.tau}\n")
         viewer.printfASCII(f"KSP solver for tentative velocity:\n")
         self._velocity_ksp.view(viewer)
         viewer.printfASCII(f"KSP solver for mixed pressure:\n")
