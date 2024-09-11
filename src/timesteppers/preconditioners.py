@@ -91,7 +91,10 @@ class PCProjection(PCBase):
         nullspace.orthonormalize()
         # Solver for mixed pressure problem
         self.lvs_pressure = LinearVariationalSolver(
-            lvp_pressure, options_prefix=prefix + "pressure_", nullspace=nullspace
+            lvp_pressure,
+            options_prefix=prefix + "pressure_",
+            nullspace=nullspace,
+            appctx=self.ctx.appctx,
         )
         # Size of domain (required for normalisation)
         V_DG0 = FunctionSpace(self._mesh, "DG", 0)
