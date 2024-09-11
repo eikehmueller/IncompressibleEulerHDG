@@ -213,7 +213,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
                     "projection": {
                         "dt": self._dt * self._a_impl[i, i],
                         "tau": self.tau,
-                        "velocity": {
+                        "tentative_velocity": {
                             "ksp_type": "gmres",
                             "pc_type": "ilu",
                         },

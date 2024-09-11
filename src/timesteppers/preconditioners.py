@@ -1,6 +1,7 @@
 """Preconditioner for timestep update based on the projection method"""
 
 from firedrake import *
+from petsc4py import PETSc
 
 __all__ = ["PCProjection"]
 
@@ -51,25 +52,30 @@ class PCProjection(PCBase):
             raise ValueError("The python context must be an ImplicitMatrixContext")
         bilinear_form = self.ctx.a
         V = bilinear_form.arguments()[0].function_space()
+        V_Q = V.sub(0)
         self._mesh = V.mesh()
         self._ises = V._ises
-        Pmat = assemble(bilinear_form).petscmat
-        # Extract matrix for tentative velocity solve, this is nothing but
-        # the upper left block of the entire system
-        A_QQ = Pmat.createSubMatrix(self._ises[0], self._ises[0])
-        velocity_ksp = PETSc.KSP().create(comm=pc.comm)
-        velocity_ksp.incrementTabLevel(1, parent=pc)
-        velocity_ksp.setOptionsPrefix(prefix + "velocity_")
-        velocity_ksp.setOperators(A_QQ, A_QQ)
-        velocity_ksp.setFromOptions()
-        self._velocity_ksp = velocity_ksp
+
         # timestep size and HDG penalty parameter
         self.dt = PETSc.Options().getReal(prefix + "dt", 1.0)
         self.tau = PETSc.Options().getReal(prefix + "tau", 1.0)
-        V_Q = V.sub(0)
-        self.Q_tentative = Function(V_Q)
+
         w, psi, mu = TestFunctions(V)
         u, p, lmbda = TrialFunctions(V)
+        # extract velocity block (for tentative velocity computation)
+        a_split = formmanipulation.split_form(bilinear_form)
+        for idx, sub_form in a_split:
+            if idx == (0, 0):
+                a_tentative = sub_form
+        petsc_mat = assemble(a_tentative).M.handle
+        self.Q_tentative = Function(V_Q)
+        tentative_velocity_ksp = PETSc.KSP().create(comm=pc.comm)
+        tentative_velocity_ksp.incrementTabLevel(1, parent=pc)
+        tentative_velocity_ksp.setOptionsPrefix(prefix + "tentative_velocity_")
+        tentative_velocity_ksp.setOperators(petsc_mat, petsc_mat)
+        tentative_velocity_ksp.setFromOptions()
+        self.tentative_velocity_ksp = tentative_velocity_ksp
+
         # weak form for mixed pressure solve
         a_mixed = (
             inner(w, u) * dx
@@ -110,7 +116,7 @@ class PCProjection(PCBase):
         # Step 1: compute tentative velocity
         r_Q = x.getSubVector(self._ises[0])
         with self.Q_tentative.dat.vec as v:
-            self._velocity_ksp.solve(r_Q, v)
+            self.tentative_velocity_ksp.solve(r_Q, v)
         # Step 2: solve mixed system for pressure
         self.lvs_pressure.solve()
         # Step 3: assign solution
@@ -147,7 +153,7 @@ class PCProjection(PCBase):
         viewer.printfASCII(f"  dt = {self.dt:12.6e}\n")
         viewer.printfASCII(f"  tau = {self.tau:8.4f}\n")
         viewer.printfASCII(f"KSP solver for tentative velocity:\n")
-        self._velocity_ksp.view(viewer)
+        self.tentative_velocity_ksp.view(viewer)
         viewer.printfASCII(f"KSP solver for mixed pressure:\n")
         self.lvs_pressure.snes.getKSP().view(viewer)
 
