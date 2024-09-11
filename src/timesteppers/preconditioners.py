@@ -144,8 +144,8 @@ class PCProjection(PCBase):
     def view(self, pc, viewer=None):
         """Viewer KSPs of tentative-velocity and mixed pressure system"""
         super().view(pc, viewer)
-        viewer.printfASCII(f"dt = {self.dt}\n")
-        viewer.printfASCII(f"tau = {self.tau}\n")
+        viewer.printfASCII(f"  dt = {self.dt:12.6e}\n")
+        viewer.printfASCII(f"  tau = {self.tau:8.4f}\n")
         viewer.printfASCII(f"KSP solver for tentative velocity:\n")
         self._velocity_ksp.view(viewer)
         viewer.printfASCII(f"KSP solver for mixed pressure:\n")
