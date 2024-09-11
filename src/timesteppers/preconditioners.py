@@ -74,7 +74,7 @@ class PCProjection(PCBase):
         a_mixed = (
             inner(w, u) * dx
             - self._pressure_gradient(w, p, lmbda)
-            + self._Gamma(psi, mu, u, p, lmbda)
+            + Constant(1 / self.dt) * self._Gamma(psi, mu, u, p, lmbda)
         )
 
         self.residual = Cofunction(V_Q.dual())
