@@ -223,6 +223,7 @@ class IncompressibleEulerHDGIMEX(IncompressibleEuler):
         # tentative velocity solve
         solver_parameters = {
             "ksp_type": "gmres",
+            "ksp_rtol": 1e-10,
             "pc_type": "ilu",
         }
         u_Q = TrialFunction(self._V_Q)
