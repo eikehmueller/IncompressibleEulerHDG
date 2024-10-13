@@ -46,7 +46,7 @@ $$
 
 and $f = \frac{d\Psi}{dt} Q_s(x,y)$.
 
-For further details on the used discretisation and timestepping methods see [here](https://github.com/eikehmueller/IncompressibleEulerHDG/blob/gh-pages/discretisation.pdf).
+For further details on the used discretisation and timestepping methods see [here](https://www.google.co.uk).
 
 ## Installation
 To install this package run 
