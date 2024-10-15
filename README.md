@@ -46,7 +46,7 @@ $$
 
 and $f = \frac{d\Psi}{dt} Q_s(x,y)$.
 
-For further details on the used discretisation and timestepping methods see [here](https://www.google.co.uk).
+For further details on the used discretisation and timestepping methods see [arxiv preprint](http://arxiv.org/abs/2410.09790).
 
 ## Installation
 To install this package run 
