@@ -16,10 +16,7 @@ long_description = """
 Hybridisable DG discretisation of the incompressible Euler equations.
 
 Implement several timestepping methods based on the DG discretisations described
-in:
-
-    Guzmán, J., Shu, C.W. and Sequeira, F.A., 2017. "H (div) conforming and DG methods for 
-    incompressible Euler’s equations." IMA Journal of Numerical Analysis, 37(4), pp.1733-1771.
+in http://arxiv.org/abs/2410.09790.
 
 For further details and instructions on how to use this code see README.md.
 """
