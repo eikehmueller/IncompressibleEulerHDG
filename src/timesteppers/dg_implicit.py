@@ -10,7 +10,12 @@ __all__ = ["IncompressibleEulerDGImplicit"]
 class IncompressibleEulerDGImplicit(IncompressibleEuler):
     """Solver for incompressible Euler equations based on implicit DG method
 
-    For details see Section 2.2 of Guzman et al. (2016).
+    For details see Section 2.2 of 
+
+    Johnny Guzman, Chi-Wang Shu, Filander A Sequeira (2017):
+    H(div) conforming and DG methods for incompressible Euler’s equations
+    IMA Journal of Numerical Analysis, Volume 37, Issue 4, October 2017,
+    Pages 1733–1771
     """
 
     def __init__(self, mesh, degree, dt, flux="upwind", callbacks=None):
